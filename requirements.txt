@@ -1,0 +1,27 @@
+# Kage Bunshin no Jutsu Requirements
+# ====================================
+
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# SSE Streaming
+sse-starlette==1.8.2
+
+# Database
+# asyncpg already installed (0.31.0 with pre-built wheel)
+
+# Data Validation (updated for Python 3.13 compat)
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.23.3
+httpx==0.26.0  # For testing FastAPI
+
+# Existing dependencies from Weeks 1-2
+# (These should already be installed)
+# aiofiles==23.2.1
+# typing-extensions==4.9.0
