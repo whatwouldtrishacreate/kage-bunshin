@@ -1,0 +1,136 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior in Kage Bunshin
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the sections below to help us fix the issue.
+
+  - type: checkboxes
+    id: search
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify before submitting
+      options:
+        - label: I searched existing issues and this hasn't been reported yet
+          required: true
+        - label: I read the documentation and this is not expected behavior
+          required: true
+        - label: This is not a security vulnerability (those should be reported privately)
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear and concise description of what the bug is
+      placeholder: When I submit a task with multiple CLI assignments, the server crashes...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue
+      placeholder: |
+        1. Start server with `uvicorn api.main:app`
+        2. Submit task via POST /api/v1/tasks with this payload: {...}
+        3. Observe error in logs
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Task should execute successfully and return results
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Server crashes with traceback
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs / Screenshots
+      description: Paste relevant error messages, logs, or screenshots
+      placeholder: |
+        ```
+        Traceback (most recent call last):
+          File "api/main.py", line 123, in submit_task
+            ...
+        ```
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Kage Bunshin Version
+      description: Which version are you using? (run `git log -1 --oneline` in project directory)
+      placeholder: 1.0.0-alpha or commit hash (e.g., 9386294)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of the system is affected?
+      options:
+        - API Layer (FastAPI, endpoints)
+        - Orchestrator (task execution, parallel coordination)
+        - Database (PostgreSQL, schema, queries)
+        - Git Operations (worktrees, merging)
+        - CLI Adapters (Claude Code, Gemini, Ollama)
+        - SSE Streaming (progress updates)
+        - Documentation
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your system environment details
+      value: |
+        - **OS**: (e.g., Ubuntu 22.04, macOS 14, Windows 11)
+        - **Python Version**: (run `python --version`)
+        - **PostgreSQL Version**: (run `psql --version`)
+        - **Git Version**: (run `git --version`)
+        - **CLI Tools Installed**: (e.g., Claude Code, Gemini CLI, Ollama)
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, configuration details, or related issues
+      placeholder: This started happening after upgrading to Python 3.13...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you like to help fix this?
+      options:
+        - label: I'm willing to submit a PR to fix this issue
