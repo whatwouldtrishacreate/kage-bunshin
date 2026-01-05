@@ -76,13 +76,13 @@ class ClaudeCodeAdapter(CLIAdapter):
         start_time = datetime.now()
 
         try:
-            # Step 1: Create prompt file
-            prompt_file = await self._write_prompt_file(task, worktree_path)
+            # Step 1: Build prompt content
+            prompt_content = self._build_prompt(task)
 
-            # Step 2: Run Claude Code
+            # Step 2: Run Claude Code with prompt via stdin
             command = self._construct_command(task, worktree_path)
-            stdout, stderr, returncode = await self._run_subprocess(
-                command, worktree_path, task.timeout
+            stdout, stderr, returncode = await self._run_subprocess_with_stdin(
+                command, worktree_path, task.timeout, prompt_content
             )
 
             # Step 3: Parse output
@@ -108,10 +108,6 @@ class ClaudeCodeAdapter(CLIAdapter):
             # Update stats
             self._execution_count += 1
             self._total_cost += cost
-
-            # Cleanup prompt file
-            if prompt_file and prompt_file.exists():
-                prompt_file.unlink()
 
             return ExecutionResult(
                 task_id=task.task_id,
@@ -150,31 +146,6 @@ class ClaudeCodeAdapter(CLIAdapter):
                 duration=duration
             )
 
-    async def _write_prompt_file(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
-    ) -> Path:
-        """
-        Write task prompt to temporary file.
-
-        Args:
-            task: Task to execute
-            worktree_path: Worktree path
-
-        Returns:
-            Path to prompt file
-        """
-        # Create prompt with task description and context
-        prompt = self._build_prompt(task)
-
-        # Write to temp file in worktree
-        prompt_file = worktree_path / ".claude_task_prompt.txt"
-        with open(prompt_file, "w") as f:
-            f.write(prompt)
-
-        return prompt_file
-
     def _build_prompt(self, task: TaskAssignment) -> str:
         """
         Build prompt for Claude Code.
@@ -210,7 +181,10 @@ Please proceed with implementing this task.
         """
         Construct Claude Code command.
 
-        Uses non-interactive mode with prompt from file.
+        Uses non-interactive mode with prompt via stdin.
+
+        Note: Claude Code doesn't have a --prompt flag. Instead, we use
+        --print mode and pipe the prompt via stdin.
 
         Args:
             task: Task to execute
@@ -219,13 +193,66 @@ Please proceed with implementing this task.
         Returns:
             Command as list of strings
         """
-        prompt_file = worktree_path / ".claude_task_prompt.txt"
-
         return [
             "claude",
-            "--prompt", str(prompt_file),
-            "--no-interactive"
+            "--print",
+            "--no-session-persistence"
         ]
+
+    async def _run_subprocess_with_stdin(
+        self,
+        command: List[str],
+        cwd: Path,
+        timeout: int,
+        stdin_content: str
+    ) -> tuple[str, str, int]:
+        """
+        Run command as async subprocess with stdin input.
+
+        Args:
+            command: Command to execute
+            cwd: Working directory
+            timeout: Timeout in seconds
+            stdin_content: Content to pipe to stdin
+
+        Returns:
+            Tuple of (stdout, stderr, returncode)
+
+        Raises:
+            asyncio.TimeoutError: If command times out
+        """
+        import asyncio
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=cwd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=self._get_env_vars()
+            )
+
+            # Write prompt to stdin and communicate
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(input=stdin_content.encode('utf-8')),
+                timeout=timeout
+            )
+
+            return (
+                stdout.decode('utf-8', errors='replace'),
+                stderr.decode('utf-8', errors='replace'),
+                proc.returncode
+            )
+
+        except asyncio.TimeoutError:
+            # Kill the process
+            try:
+                proc.kill()
+                await proc.wait()
+            except:
+                pass
+            raise
 
     def _parse_output(self, stdout: str, stderr: str) -> Dict[str, Any]:
         """
