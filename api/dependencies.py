@@ -49,7 +49,6 @@ async def get_database() -> DatabaseManager:
 
     Dependency for routes that need database access.
     """
-    global _database
     if _database is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -64,7 +63,6 @@ async def get_orchestrator() -> OrchestratorService:
 
     Dependency for routes that need task orchestration.
     """
-    global _orchestrator
     if _orchestrator is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -133,7 +131,5 @@ async def shutdown_services():
 
     Called by FastAPI lifespan context manager.
     """
-    global _database
-
     if _database:
         await _database.disconnect()
