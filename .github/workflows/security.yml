@@ -11,7 +11,7 @@ on:
 
 jobs:
   security-scan:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker, build]
 
     steps:
     - name: Checkout code
@@ -48,7 +48,7 @@ jobs:
         path: bandit-report.json
 
   dependency-review:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker, build]
     if: github.event_name == 'pull_request'
 
     steps:
