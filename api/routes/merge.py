@@ -15,10 +15,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.dependencies import (BASE_BRANCH, PROJECT_DIR, get_database,
-                              get_orchestrator, verify_api_key)
-from api.models import (ErrorResponse, MergeRequest, MergeResultResponse,
-                        MergeStrategy)
+from api.dependencies import (
+    BASE_BRANCH,
+    PROJECT_DIR,
+    get_database,
+    get_orchestrator,
+    verify_api_key,
+)
+from api.models import ErrorResponse, MergeRequest, MergeResultResponse, MergeStrategy
 from orchestrator.merge import MergeExecutor
 from orchestrator.service import OrchestratorService
 from storage.database import DatabaseManager

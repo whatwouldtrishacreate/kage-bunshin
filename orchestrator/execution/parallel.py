@@ -30,8 +30,7 @@ from typing import Any, Dict, List, Optional
 from ..state.context import ContextManager
 from ..state.locks import LockManager
 from ..state.worktree import SessionWorktree, WorktreeManager
-from .adapters import (CLIAdapter, ExecutionResult, ExecutionStatus,
-                       TaskAssignment)
+from .adapters import CLIAdapter, ExecutionResult, ExecutionStatus, TaskAssignment
 
 
 @dataclass

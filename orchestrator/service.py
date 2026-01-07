@@ -20,10 +20,14 @@ from uuid import UUID
 from api.models import CLIAssignment, TaskDB, TaskStatus
 from storage.database import DatabaseManager
 
-from .execution.adapters import (AutoClaudeAdapter, ClaudeCodeAdapter,
-                                 GeminiAdapter, OllamaAdapter, TaskAssignment)
-from .execution.parallel import (AggregatedResult, ParallelExecutor,
-                                 ParallelTaskConfig)
+from .execution.adapters import (
+    AutoClaudeAdapter,
+    ClaudeCodeAdapter,
+    GeminiAdapter,
+    OllamaAdapter,
+    TaskAssignment,
+)
+from .execution.parallel import AggregatedResult, ParallelExecutor, ParallelTaskConfig
 
 
 class OrchestratorService:

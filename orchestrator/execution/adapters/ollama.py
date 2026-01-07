@@ -25,9 +25,15 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .base import (CLIAdapter, CLIExecutionError, CLINotFoundError,
-                   CLITimeoutError, ExecutionResult, ExecutionStatus,
-                   TaskAssignment)
+from .base import (
+    CLIAdapter,
+    CLIExecutionError,
+    CLINotFoundError,
+    CLITimeoutError,
+    ExecutionResult,
+    ExecutionStatus,
+    TaskAssignment,
+)
 
 
 class OllamaAdapter(CLIAdapter):

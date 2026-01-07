@@ -25,9 +25,15 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .base import (CLIAdapter, CLIExecutionError, CLINotFoundError,
-                   CLITimeoutError, ExecutionResult, ExecutionStatus,
-                   TaskAssignment)
+from .base import (
+    CLIAdapter,
+    CLIExecutionError,
+    CLINotFoundError,
+    CLITimeoutError,
+    ExecutionResult,
+    ExecutionStatus,
+    TaskAssignment,
+)
 
 
 class AutoClaudeAdapter(CLIAdapter):
@@ -327,5 +333,6 @@ class AutoClaudeAdapter(CLIAdapter):
 
 
 import asyncio
+
 # Import datetime for start_time
 from datetime import datetime

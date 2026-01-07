@@ -29,14 +29,20 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from orchestrator.execution.adapters import (AutoClaudeAdapter,
-                                             ClaudeCodeAdapter,
-                                             ExecutionResult, ExecutionStatus,
-                                             GeminiAdapter, OllamaAdapter,
-                                             TaskAssignment)
-from orchestrator.execution.parallel import (AggregatedResult,
-                                             ParallelExecutor,
-                                             ParallelTaskConfig)
+from orchestrator.execution.adapters import (
+    AutoClaudeAdapter,
+    ClaudeCodeAdapter,
+    ExecutionResult,
+    ExecutionStatus,
+    GeminiAdapter,
+    OllamaAdapter,
+    TaskAssignment,
+)
+from orchestrator.execution.parallel import (
+    AggregatedResult,
+    ParallelExecutor,
+    ParallelTaskConfig,
+)
 
 
 @pytest.fixture

@@ -16,8 +16,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from api.dependencies import get_orchestrator, verify_api_key
-from api.models import (ErrorResponse, TaskListResponse, TaskResponse,
-                        TaskStatus, TaskSubmitRequest)
+from api.models import (
+    ErrorResponse,
+    TaskListResponse,
+    TaskResponse,
+    TaskStatus,
+    TaskSubmitRequest,
+)
 from orchestrator.service import OrchestratorService
 
 router = APIRouter(
