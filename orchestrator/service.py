@@ -56,13 +56,25 @@ class OrchestratorService:
         self.database = database
         self.base_branch = base_branch
 
-        # Initialize CLI adapters
-        self.adapters = {
-            "auto-claude": AutoClaudeAdapter(),
-            "ollama": OllamaAdapter(),
-            "claude-code": ClaudeCodeAdapter(),
-            "gemini": GeminiAdapter(),
-        }
+        # Initialize CLI adapters (only those that are available)
+        self.adapters = {}
+
+        # Try to initialize each adapter - skip if CLI not found
+        adapter_classes = [
+            ("auto-claude", AutoClaudeAdapter),
+            ("ollama", OllamaAdapter),
+            ("claude-code", ClaudeCodeAdapter),
+            ("gemini", GeminiAdapter),
+        ]
+
+        for cli_name, adapter_class in adapter_classes:
+            try:
+                self.adapters[cli_name] = adapter_class()
+            except Exception as e:
+                # Skip adapters that can't initialize (CLI not installed, etc.)
+                print(
+                    f"Warning: Skipping {cli_name} adapter - {type(e).__name__}: {e}"
+                )
 
         # Initialize parallel executor
         self.executor = ParallelExecutor(
