@@ -10,7 +10,7 @@ python-multipart==0.0.6
 sse-starlette==1.8.2
 
 # Database
-# asyncpg already installed (0.31.0 with pre-built wheel)
+asyncpg==0.31.0  # PostgreSQL async driver
 
 # Data Validation (updated for Python 3.13 compat)
 pydantic>=2.10.0
