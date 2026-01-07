@@ -26,14 +26,15 @@ import os
 import re
 import shutil
 import subprocess
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 
 class WorktreeError(Exception):
     """Error during worktree operations."""
+
     pass
 
 
@@ -261,7 +262,9 @@ class WorktreeManager:
                 f"Worktree already locked by another process: {worktree_path}"
             )
 
-        print(f"Created worktree: session-{session_id}-{cli_name} on branch {branch_name}")
+        print(
+            f"Created worktree: session-{session_id}-{cli_name} on branch {branch_name}"
+        )
 
         # Create session object
         session = SessionWorktree(
@@ -305,7 +308,9 @@ class WorktreeManager:
                 ["worktree", "remove", "--force", str(session.worktree_path)]
             )
             if result.returncode == 0:
-                print(f"Removed worktree: session-{session.session_id}-{session.cli_name}")
+                print(
+                    f"Removed worktree: session-{session.session_id}-{session.cli_name}"
+                )
             else:
                 print(f"Warning: Could not remove worktree: {result.stderr}")
                 shutil.rmtree(session.worktree_path, ignore_errors=True)
@@ -432,8 +437,14 @@ class WorktreeManager:
 
         await self._run_git(["worktree", "prune"])
 
-    async def has_uncommitted_changes(self, session: Optional[SessionWorktree] = None) -> bool:
+    async def has_uncommitted_changes(
+        self, session: Optional[SessionWorktree] = None
+    ) -> bool:
         """Check if there are uncommitted changes in a session's worktree."""
-        cwd = session.worktree_path if session and session.worktree_path.exists() else None
+        cwd = (
+            session.worktree_path
+            if session and session.worktree_path.exists()
+            else None
+        )
         result = await self._run_git(["status", "--porcelain"], cwd=cwd)
         return bool(result.stdout.strip())

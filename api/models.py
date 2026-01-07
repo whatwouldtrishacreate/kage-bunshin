@@ -9,18 +9,19 @@ Converts between API representations and internal orchestrator models.
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
-
 
 # ============================================================================
 # Enums
 # ============================================================================
 
+
 class TaskStatus(str, Enum):
     """Task execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -30,8 +31,9 @@ class TaskStatus(str, Enum):
 
 class MergeStrategy(str, Enum):
     """Merge strategy for parallel execution results."""
+
     THEIRS = "theirs"  # Accept best result automatically
-    AUTO = "auto"      # Auto-merge if no conflicts
+    AUTO = "auto"  # Auto-merge if no conflicts
     MANUAL = "manual"  # Require manual conflict resolution
 
 
@@ -39,11 +41,19 @@ class MergeStrategy(str, Enum):
 # Request Models
 # ============================================================================
 
+
 class CLIAssignment(BaseModel):
     """Assignment of a task to a specific CLI."""
-    cli_name: str = Field(..., description="CLI tool name (auto-claude, ollama, claude-code, gemini)")
-    context: Dict[str, Any] = Field(default_factory=dict, description="CLI-specific context")
-    timeout: int = Field(default=600, description="Execution timeout in seconds", ge=60, le=3600)
+
+    cli_name: str = Field(
+        ..., description="CLI tool name (auto-claude, ollama, claude-code, gemini)"
+    )
+    context: Dict[str, Any] = Field(
+        default_factory=dict, description="CLI-specific context"
+    )
+    timeout: int = Field(
+        default=600, description="Execution timeout in seconds", ge=60, le=3600
+    )
 
     @validator("cli_name")
     def validate_cli_name(cls, v):
@@ -55,13 +65,24 @@ class CLIAssignment(BaseModel):
 
 class TaskSubmitRequest(BaseModel):
     """Request to submit a new task for parallel execution."""
-    description: str = Field(..., description="Task description for CLIs", min_length=10)
-    cli_assignments: List[CLIAssignment] = Field(..., description="CLI assignments (1-4)", min_items=1, max_items=4)
+
+    description: str = Field(
+        ..., description="Task description for CLIs", min_length=10
+    )
+    cli_assignments: List[CLIAssignment] = Field(
+        ..., description="CLI assignments (1-4)", min_items=1, max_items=4
+    )
 
     # Optional parameters
-    max_retries: int = Field(default=3, description="Max retry attempts per CLI", ge=0, le=5)
-    retry_delay: float = Field(default=5.0, description="Base retry delay in seconds", ge=1.0, le=60.0)
-    merge_strategy: MergeStrategy = Field(default=MergeStrategy.THEIRS, description="Merge strategy")
+    max_retries: int = Field(
+        default=3, description="Max retry attempts per CLI", ge=0, le=5
+    )
+    retry_delay: float = Field(
+        default=5.0, description="Base retry delay in seconds", ge=1.0, le=60.0
+    )
+    merge_strategy: MergeStrategy = Field(
+        default=MergeStrategy.THEIRS, description="Merge strategy"
+    )
 
     # Metadata
     created_by: Optional[str] = Field(None, description="User/system identifier")
@@ -73,27 +94,32 @@ class TaskSubmitRequest(BaseModel):
                 "cli_assignments": [
                     {"cli_name": "auto-claude", "context": {"complexity": "standard"}},
                     {"cli_name": "ollama", "context": {}},
-                    {"cli_name": "claude-code", "context": {}}
+                    {"cli_name": "claude-code", "context": {}},
                 ],
                 "max_retries": 3,
-                "merge_strategy": "auto"
+                "merge_strategy": "auto",
             }
         }
 
 
 class MergeRequest(BaseModel):
     """Request to merge task results into main branch."""
+
     task_id: UUID = Field(..., description="Task ID to merge")
     strategy: MergeStrategy = Field(..., description="Merge strategy to use")
-    cli_name: Optional[str] = Field(None, description="Specific CLI result to merge (if manual)")
+    cli_name: Optional[str] = Field(
+        None, description="Specific CLI result to merge (if manual)"
+    )
 
 
 # ============================================================================
 # Response Models
 # ============================================================================
 
+
 class CLIResultSummary(BaseModel):
     """Summary of a single CLI execution result."""
+
     cli_name: str
     status: str
     files_modified: List[str] = Field(default_factory=list)
@@ -105,6 +131,7 @@ class CLIResultSummary(BaseModel):
 
 class TaskResponse(BaseModel):
     """Response with task information."""
+
     id: UUID
     description: str
     status: TaskStatus
@@ -139,13 +166,14 @@ class TaskResponse(BaseModel):
                 "failure_count": 0,
                 "total_cost": 3.0,
                 "total_duration": 299.5,
-                "best_cli": "ollama"
+                "best_cli": "ollama",
             }
         }
 
 
 class TaskListResponse(BaseModel):
     """Response with list of tasks."""
+
     tasks: List[TaskResponse]
     total: int
     page: int = 1
@@ -154,6 +182,7 @@ class TaskListResponse(BaseModel):
 
 class MergeResultResponse(BaseModel):
     """Response from merge operation."""
+
     task_id: UUID
     strategy: str
     success: bool
@@ -165,6 +194,7 @@ class MergeResultResponse(BaseModel):
 
 class ProgressEvent(BaseModel):
     """Real-time progress event."""
+
     task_id: UUID
     cli_name: str
     session_id: str
@@ -183,7 +213,7 @@ class ProgressEvent(BaseModel):
                 "session_id": "task-001-auto-claude",
                 "status": "working",
                 "message": "Phase 1: Planning implementation",
-                "timestamp": "2026-01-04T10:00:05Z"
+                "timestamp": "2026-01-04T10:00:05Z",
             }
         }
 
@@ -192,8 +222,10 @@ class ProgressEvent(BaseModel):
 # Error Responses
 # ============================================================================
 
+
 class ErrorResponse(BaseModel):
     """Standard error response."""
+
     error: str = Field(..., description="Error message")
     detail: Optional[str] = Field(None, description="Detailed error information")
     task_id: Optional[UUID] = Field(None, description="Related task ID if applicable")
@@ -203,7 +235,7 @@ class ErrorResponse(BaseModel):
             "example": {
                 "error": "Task not found",
                 "detail": "No task with ID 550e8400-e29b-41d4-a716-446655440000",
-                "task_id": "550e8400-e29b-41d4-a716-446655440000"
+                "task_id": "550e8400-e29b-41d4-a716-446655440000",
             }
         }
 
@@ -212,8 +244,10 @@ class ErrorResponse(BaseModel):
 # Database Models (for internal use with asyncpg)
 # ============================================================================
 
+
 class TaskDB(BaseModel):
     """Database representation of a task."""
+
     id: UUID
     description: str
     status: str
@@ -241,22 +275,30 @@ class TaskDB(BaseModel):
 
         # Add result data if available
         if self.result:
-            response_data.update({
-                "cli_results": [
-                    CLIResultSummary(**r) for r in self.result.get("cli_results", [])
-                ],
-                "success_count": self.result.get("success_count"),
-                "failure_count": self.result.get("failure_count"),
-                "total_cost": self.result.get("total_cost"),
-                "total_duration": self.result.get("total_duration"),
-                "best_cli": self.result.get("best_result", {}).get("cli_name") if self.result.get("best_result") else None,
-            })
+            response_data.update(
+                {
+                    "cli_results": [
+                        CLIResultSummary(**r)
+                        for r in self.result.get("cli_results", [])
+                    ],
+                    "success_count": self.result.get("success_count"),
+                    "failure_count": self.result.get("failure_count"),
+                    "total_cost": self.result.get("total_cost"),
+                    "total_duration": self.result.get("total_duration"),
+                    "best_cli": (
+                        self.result.get("best_result", {}).get("cli_name")
+                        if self.result.get("best_result")
+                        else None
+                    ),
+                }
+            )
 
         return TaskResponse(**response_data)
 
 
 class ProgressEventDB(BaseModel):
     """Database representation of a progress event."""
+
     id: int
     task_id: UUID
     cli_name: str

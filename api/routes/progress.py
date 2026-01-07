@@ -11,21 +11,18 @@ Endpoints:
 
 import asyncio
 from datetime import datetime
-from uuid import UUID
 from typing import AsyncGenerator
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sse_starlette.sse import EventSourceResponse
 
-from api.models import ErrorResponse
 from api.dependencies import get_database, verify_api_key
+from api.models import ErrorResponse
 from storage.database import DatabaseManager
 
-
 router = APIRouter(
-    prefix="/api/v1/tasks",
-    tags=["progress"],
-    dependencies=[Depends(verify_api_key)]
+    prefix="/api/v1/tasks", tags=["progress"], dependencies=[Depends(verify_api_key)]
 )
 
 
@@ -44,11 +41,10 @@ router = APIRouter(
     parallel CLI execution.
 
     The stream will automatically close when the task completes or fails.
-    """
+    """,
 )
 async def stream_progress(
-    task_id: UUID,
-    database: DatabaseManager = Depends(get_database)
+    task_id: UUID, database: DatabaseManager = Depends(get_database)
 ):
     """
     Stream progress events via SSE.
@@ -59,8 +55,7 @@ async def stream_progress(
     task = await database.get_task(task_id)
     if not task:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Task {task_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
         )
 
     async def event_generator() -> AsyncGenerator[dict, None]:
@@ -77,8 +72,8 @@ async def stream_progress(
             "data": {
                 "task_id": str(task_id),
                 "message": "Connected to progress stream",
-                "timestamp": datetime.now().isoformat()
-            }
+                "timestamp": datetime.now().isoformat(),
+            },
         }
 
         # Poll for progress events
@@ -96,32 +91,26 @@ async def stream_progress(
                             "task_id": str(task_id),
                             "status": task.status,
                             "message": f"Task {task.status}",
-                            "timestamp": datetime.now().isoformat()
-                        }
+                            "timestamp": datetime.now().isoformat(),
+                        },
                     }
                     break
 
                 # Get new progress events since last poll
                 events = await database.get_task_events(
-                    task_id=task_id,
-                    since=last_event_time
+                    task_id=task_id, since=last_event_time
                 )
 
                 # Send each new event
                 for event in events:
-                    yield {
-                        "event": "progress",
-                        "data": event.to_event().dict()
-                    }
+                    yield {"event": "progress", "data": event.to_event().dict()}
                     last_event_time = event.timestamp
 
                 # Send heartbeat if no events
                 if not events:
                     yield {
                         "event": "heartbeat",
-                        "data": {
-                            "timestamp": datetime.now().isoformat()
-                        }
+                        "data": {"timestamp": datetime.now().isoformat()},
                     }
 
                 # Wait before next poll (adjust based on your needs)
@@ -131,10 +120,7 @@ async def stream_progress(
                 # Send error event
                 yield {
                     "event": "error",
-                    "data": {
-                        "error": str(e),
-                        "timestamp": datetime.now().isoformat()
-                    }
+                    "data": {"error": str(e), "timestamp": datetime.now().isoformat()},
                 }
                 break
 

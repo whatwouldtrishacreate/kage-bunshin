@@ -1,18 +1,12 @@
 """CLI Adapters for CLI Council."""
 
-from .base import (
-    CLIAdapter,
-    TaskAssignment,
-    ExecutionResult,
-    ExecutionStatus,
-    CLIExecutionError,
-    CLINotFoundError,
-    CLITimeoutError,
-)
 from .auto_claude import AutoClaudeAdapter
-from .ollama import OllamaAdapter
+from .base import (CLIAdapter, CLIExecutionError, CLINotFoundError,
+                   CLITimeoutError, ExecutionResult, ExecutionStatus,
+                   TaskAssignment)
 from .claude_code import ClaudeCodeAdapter
 from .gemini import GeminiAdapter
+from .ollama import OllamaAdapter
 
 __all__ = [
     # Base classes

@@ -19,8 +19,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routes import tasks_router, progress_router, merge_router
 from api.dependencies import initialize_services, shutdown_services
+from api.routes import merge_router, progress_router, tasks_router
 
 
 @asynccontextmanager
@@ -86,7 +86,7 @@ app = FastAPI(
     license_info={
         "name": "MIT",
     },
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # CORS middleware (configure as needed)
@@ -120,8 +120,8 @@ async def root():
             "progress": "/api/v1/tasks/{task_id}/progress",
             "merge": "/api/v1/tasks/{task_id}/merge",
             "docs": "/docs",
-            "openapi": "/openapi.json"
-        }
+            "openapi": "/openapi.json",
+        },
     }
 
 
@@ -129,11 +129,7 @@ async def root():
 @app.get("/health", tags=["health"])
 async def health_check():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "service": "kage-bunshin",
-        "emoji": "🥷"
-    }
+    return {"status": "healthy", "service": "kage-bunshin", "emoji": "🥷"}
 
 
 # Custom exception handlers
@@ -145,8 +141,8 @@ async def not_found_handler(request, exc):
         content={
             "error": "Not Found",
             "detail": "The requested resource was not found",
-            "path": str(request.url)
-        }
+            "path": str(request.url),
+        },
     )
 
 
@@ -158,8 +154,8 @@ async def internal_error_handler(request, exc):
         content={
             "error": "Internal Server Error",
             "detail": "An unexpected error occurred",
-            "emoji": "💥"
-        }
+            "emoji": "💥",
+        },
     )
 
 
@@ -167,9 +163,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "api.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
+        "api.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info"
     )

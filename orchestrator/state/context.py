@@ -48,16 +48,17 @@ Usage:
 """
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 from .worktree import SessionWorktree
 
 
 class ContextError(Exception):
     """Error during context operations."""
+
     pass
 
 
@@ -68,6 +69,7 @@ class ContextFile:
 
     Represents the current state of a single CLI session.
     """
+
     session_id: str
     cli_name: str
     task_id: str
@@ -140,7 +142,9 @@ class ContextManager:
         with open(context_path, "w") as f:
             json.dump(asdict(context), f, indent=2)
 
-    async def mark_done(self, session: SessionWorktree, message: Optional[str] = None) -> None:
+    async def mark_done(
+        self, session: SessionWorktree, message: Optional[str] = None
+    ) -> None:
         """
         Mark a session as done.
 
@@ -281,11 +285,7 @@ class ContextManager:
             List of sessions with locks on this file
         """
         all_contexts = await self.get_all_contexts()
-        return [
-            ctx
-            for ctx in all_contexts
-            if file_path in (ctx.files_locked or [])
-        ]
+        return [ctx for ctx in all_contexts if file_path in (ctx.files_locked or [])]
 
     async def get_stale_contexts(self, timeout_minutes: int = 30) -> List[ContextFile]:
         """

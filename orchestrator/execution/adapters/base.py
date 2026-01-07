@@ -20,15 +20,16 @@ commands in that isolated environment.
 import asyncio
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Any, Dict, List, Optional
 
 
 class ExecutionStatus(Enum):
     """Status of CLI execution."""
+
     SUCCESS = "success"
     FAILURE = "failure"
     TIMEOUT = "timeout"
@@ -39,6 +40,7 @@ class ExecutionStatus(Enum):
 @dataclass
 class TaskAssignment:
     """Task assigned to a CLI for execution."""
+
     task_id: str
     cli_name: str
     description: str
@@ -50,6 +52,7 @@ class TaskAssignment:
 @dataclass
 class ExecutionResult:
     """Result of CLI execution."""
+
     task_id: str
     cli_name: str
     status: ExecutionStatus
@@ -73,7 +76,7 @@ class ExecutionResult:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         data = asdict(self)
-        data['status'] = self.status.value
+        data["status"] = self.status.value
         return data
 
 
@@ -94,9 +97,7 @@ class CLIAdapter(ABC):
 
     @abstractmethod
     async def execute(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> ExecutionResult:
         """
         Execute a task in the given worktree.
@@ -115,9 +116,7 @@ class CLIAdapter(ABC):
 
     @abstractmethod
     def _construct_command(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> List[str]:
         """
         Construct CLI command for the task.
@@ -146,10 +145,7 @@ class CLIAdapter(ABC):
         pass
 
     async def _run_subprocess(
-        self,
-        command: List[str],
-        cwd: Path,
-        timeout: int
+        self, command: List[str], cwd: Path, timeout: int
     ) -> tuple[str, str, int]:
         """
         Run command as async subprocess.
@@ -171,18 +167,15 @@ class CLIAdapter(ABC):
                 cwd=cwd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=self._get_env_vars()
+                env=self._get_env_vars(),
             )
 
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=timeout
-            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
             return (
-                stdout.decode('utf-8', errors='replace'),
-                stderr.decode('utf-8', errors='replace'),
-                proc.returncode
+                stdout.decode("utf-8", errors="replace"),
+                stderr.decode("utf-8", errors="replace"),
+                proc.returncode,
             )
 
         except asyncio.TimeoutError:
@@ -204,6 +197,7 @@ class CLIAdapter(ABC):
             Dictionary of environment variables
         """
         import os
+
         return os.environ.copy()
 
     async def _get_modified_files(self, worktree_path: Path) -> List[str]:
@@ -218,21 +212,26 @@ class CLIAdapter(ABC):
         """
         try:
             proc = await asyncio.create_subprocess_exec(
-                "git", "diff", "--name-only", "HEAD",
+                "git",
+                "diff",
+                "--name-only",
+                "HEAD",
                 cwd=worktree_path,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
             stdout, _ = await proc.communicate()
 
-            files = stdout.decode('utf-8', errors='replace').strip().split('\n')
+            files = stdout.decode("utf-8", errors="replace").strip().split("\n")
             return [f for f in files if f]
 
         except Exception as e:
             print(f"Warning: Could not get modified files: {e}")
             return []
 
-    async def _get_commits(self, worktree_path: Path, base_branch: str = "main") -> List[str]:
+    async def _get_commits(
+        self, worktree_path: Path, base_branch: str = "main"
+    ) -> List[str]:
         """
         Get list of commits made in worktree.
 
@@ -245,14 +244,16 @@ class CLIAdapter(ABC):
         """
         try:
             proc = await asyncio.create_subprocess_exec(
-                "git", "rev-list", f"{base_branch}..HEAD",
+                "git",
+                "rev-list",
+                f"{base_branch}..HEAD",
                 cwd=worktree_path,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
             stdout, _ = await proc.communicate()
 
-            commits = stdout.decode('utf-8', errors='replace').strip().split('\n')
+            commits = stdout.decode("utf-8", errors="replace").strip().split("\n")
             return [c for c in commits if c]
 
         except Exception as e:
@@ -290,10 +291,15 @@ class CLIAdapter(ABC):
 class CLIExecutionError(Exception):
     """Error during CLI execution."""
 
-    def __init__(self, message: str, cli_name: str, task_id: str,
-                 returncode: Optional[int] = None,
-                 stdout: Optional[str] = None,
-                 stderr: Optional[str] = None):
+    def __init__(
+        self,
+        message: str,
+        cli_name: str,
+        task_id: str,
+        returncode: Optional[int] = None,
+        stdout: Optional[str] = None,
+        stderr: Optional[str] = None,
+    ):
         super().__init__(message)
         self.cli_name = cli_name
         self.task_id = task_id
@@ -304,9 +310,11 @@ class CLIExecutionError(Exception):
 
 class CLINotFoundError(CLIExecutionError):
     """CLI executable not found on system."""
+
     pass
 
 
 class CLITimeoutError(CLIExecutionError):
     """CLI execution timed out."""
+
     pass

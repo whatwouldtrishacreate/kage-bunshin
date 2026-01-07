@@ -18,30 +18,25 @@ Test scenarios:
 """
 
 import asyncio
-import pytest
-import tempfile
 import shutil
-from pathlib import Path
-from datetime import datetime
-from unittest.mock import Mock, AsyncMock, patch
-
 import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from orchestrator.execution.adapters import (
-    TaskAssignment,
-    ExecutionResult,
-    ExecutionStatus,
-    AutoClaudeAdapter,
-    OllamaAdapter,
-    ClaudeCodeAdapter,
-    GeminiAdapter,
-)
-from orchestrator.execution.parallel import (
-    ParallelExecutor,
-    ParallelTaskConfig,
-    AggregatedResult,
-)
+from orchestrator.execution.adapters import (AutoClaudeAdapter,
+                                             ClaudeCodeAdapter,
+                                             ExecutionResult, ExecutionStatus,
+                                             GeminiAdapter, OllamaAdapter,
+                                             TaskAssignment)
+from orchestrator.execution.parallel import (AggregatedResult,
+                                             ParallelExecutor,
+                                             ParallelTaskConfig)
 
 
 @pytest.fixture
@@ -53,6 +48,7 @@ def temp_git_repo():
 
         # Initialize git repo
         import subprocess
+
         subprocess.run(["git", "init"], cwd=repo_path, check=True)
         subprocess.run(
             ["git", "config", "user.name", "Test User"],
@@ -92,9 +88,7 @@ class MockAdapter:
         self._total_cost = 0.0
 
     async def execute(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> ExecutionResult:
         """Mock execution."""
         await asyncio.sleep(self.delay)
@@ -104,7 +98,9 @@ class MockAdapter:
         test_file = worktree_path / "test.txt"
         test_file.write_text(f"Output from {self.cli_name}\n")
 
-        status = ExecutionStatus.FAILURE if self.should_fail else ExecutionStatus.SUCCESS
+        status = (
+            ExecutionStatus.FAILURE if self.should_fail else ExecutionStatus.SUCCESS
+        )
         cost = 0.0 if self.cli_name == "ollama" else 1.50
 
         self._total_cost += cost
@@ -117,7 +113,7 @@ class MockAdapter:
             error="Simulated failure" if self.should_fail else None,
             files_modified=["test.txt"] if not self.should_fail else [],
             cost=cost,
-            duration=self.delay
+            duration=self.delay,
         )
 
     def get_stats(self):
@@ -139,7 +135,7 @@ class TestAdapters:
             cli_name="auto-claude",
             description="Test task",
             context={"complexity": "simple"},
-            timeout=300
+            timeout=300,
         )
 
         assert task.task_id == "001-test-task"
@@ -156,7 +152,7 @@ class TestAdapters:
             output="Test output",
             files_modified=["file1.py", "file2.py"],
             cost=0.0,
-            duration=5.2
+            duration=5.2,
         )
 
         result_dict = result.to_dict()
@@ -191,21 +187,21 @@ class TestParallelExecutor:
                     task_id="001-test",
                     cli_name="auto-claude",
                     description="Test task",
-                    context={}
+                    context={},
                 ),
                 TaskAssignment(
                     task_id="001-test",
                     cli_name="ollama",
                     description="Test task",
-                    context={}
+                    context={},
                 ),
                 TaskAssignment(
                     task_id="001-test",
                     cli_name="claude-code",
                     description="Test task",
-                    context={}
+                    context={},
                 ),
-            ]
+            ],
         )
 
         # Execute
@@ -238,10 +234,10 @@ class TestParallelExecutor:
                     task_id="002-test",
                     cli_name=cli,
                     description="Test task",
-                    context={}
+                    context={},
                 )
                 for cli in ["auto-claude", "ollama", "claude-code"]
-            ]
+            ],
         )
 
         result = await executor.execute_parallel(config)
@@ -255,6 +251,7 @@ class TestParallelExecutor:
     @pytest.mark.asyncio
     async def test_retry_logic(self, temp_git_repo):
         """Test retry logic with exponential backoff."""
+
         # Create adapter that fails first 2 times, then succeeds
         class RetryAdapter(MockAdapter):
             def __init__(self):
@@ -272,7 +269,7 @@ class TestParallelExecutor:
                         output="",
                         error="Transient network error",
                         cost=0.0,
-                        duration=0.1
+                        duration=0.1,
                     )
                 else:
                     # Succeed on 3rd attempt
@@ -289,26 +286,28 @@ class TestParallelExecutor:
                     task_id="003-retry",
                     cli_name="test-adapter",
                     description="Test task",
-                    context={}
+                    context={},
                 )
             ],
             max_retries=3,
-            retry_delay=0.1
+            retry_delay=0.1,
         )
 
         result = await executor.execute_parallel(config)
 
         # Verify
         assert result.success_count == 1
-        assert result.cli_results[0].retries == 2  # Succeeded on 3rd attempt (2 retries)
+        assert (
+            result.cli_results[0].retries == 2
+        )  # Succeeded on 3rd attempt (2 retries)
 
     @pytest.mark.asyncio
     async def test_cost_tracking(self, temp_git_repo):
         """Test cost tracking across CLIs."""
         adapters = {
             "auto-claude": MockAdapter("auto-claude"),  # $1.50
-            "ollama": MockAdapter("ollama"),             # $0.00
-            "claude-code": MockAdapter("claude-code"),   # $1.50
+            "ollama": MockAdapter("ollama"),  # $0.00
+            "claude-code": MockAdapter("claude-code"),  # $1.50
         }
 
         executor = ParallelExecutor(temp_git_repo, adapters, base_branch="master")
@@ -321,10 +320,10 @@ class TestParallelExecutor:
                     task_id="004-cost",
                     cli_name=cli,
                     description="Test task",
-                    context={}
+                    context={},
                 )
                 for cli in ["auto-claude", "ollama", "claude-code"]
-            ]
+            ],
         )
 
         result = await executor.execute_parallel(config)
@@ -354,10 +353,10 @@ class TestParallelExecutor:
                     task_id="005-aggregation",
                     cli_name=cli,
                     description="Test task",
-                    context={}
+                    context={},
                 )
                 for cli in ["auto-claude", "ollama"]
-            ]
+            ],
         )
 
         result = await executor.execute_parallel(config)
@@ -389,9 +388,9 @@ class TestResourceCleanup:
                     task_id="006-cleanup",
                     cli_name="test",
                     description="Test task",
-                    context={}
+                    context={},
                 )
-            ]
+            ],
         )
 
         await executor.execute_parallel(config)

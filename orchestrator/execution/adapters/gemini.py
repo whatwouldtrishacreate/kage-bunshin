@@ -24,17 +24,11 @@ Cost Model: ~$0.15-0.30 per task (Gemini 2.0 Flash)
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
-from .base import (
-    CLIAdapter,
-    TaskAssignment,
-    ExecutionResult,
-    ExecutionStatus,
-    CLIExecutionError,
-    CLINotFoundError,
-    CLITimeoutError,
-)
+from .base import (CLIAdapter, CLIExecutionError, CLINotFoundError,
+                   CLITimeoutError, ExecutionResult, ExecutionStatus,
+                   TaskAssignment)
 
 
 class GeminiAdapter(CLIAdapter):
@@ -56,9 +50,7 @@ class GeminiAdapter(CLIAdapter):
         self.model = model
 
     async def execute(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> ExecutionResult:
         """
         Execute task using Gemini CLI.
@@ -76,8 +68,8 @@ class GeminiAdapter(CLIAdapter):
         Returns:
             ExecutionResult with status and output
         """
-        from datetime import datetime
         import asyncio
+        from datetime import datetime
 
         start_time = datetime.now()
 
@@ -126,7 +118,7 @@ class GeminiAdapter(CLIAdapter):
                 commits=commits,
                 cost=cost,
                 duration=duration,
-                retries=0
+                retries=0,
             )
 
         except asyncio.TimeoutError:
@@ -138,7 +130,7 @@ class GeminiAdapter(CLIAdapter):
                 output="",
                 error=f"Gemini execution timed out after {task.timeout}s",
                 cost=0.0,
-                duration=duration
+                duration=duration,
             )
 
         except Exception as e:
@@ -150,14 +142,10 @@ class GeminiAdapter(CLIAdapter):
                 output="",
                 error=str(e),
                 cost=0.0,
-                duration=duration
+                duration=duration,
             )
 
-    def _build_prompt(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
-    ) -> str:
+    def _build_prompt(self, task: TaskAssignment, worktree_path: Path) -> str:
         """
         Build prompt for Gemini.
 
@@ -190,9 +178,7 @@ Format code changes as:
         return prompt
 
     def _construct_command(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> List[str]:
         """
         Construct Gemini CLI command.
@@ -210,11 +196,7 @@ Format code changes as:
 
         # Try gemini-cli first (if installed)
         # Format: gemini --model <model> --prompt "<prompt>"
-        return [
-            "gemini",
-            "--model", self.model,
-            "--prompt", prompt
-        ]
+        return ["gemini", "--model", self.model, "--prompt", prompt]
 
     def _parse_output(self, stdout: str, stderr: str) -> Dict[str, Any]:
         """
@@ -238,7 +220,7 @@ Format code changes as:
             "code_changes": [],
             "recommendations": [],
             "tokens_used": 0,
-            "errors": []
+            "errors": [],
         }
 
         # Extract code blocks with file paths
@@ -247,10 +229,9 @@ Format code changes as:
         matches = re.findall(file_pattern, stdout, re.DOTALL)
 
         for file_path, code in matches:
-            result["code_changes"].append({
-                "file": file_path.strip(),
-                "code": code.strip()
-            })
+            result["code_changes"].append(
+                {"file": file_path.strip(), "code": code.strip()}
+            )
 
         # Extract analysis section
         analysis_match = re.search(r"Analysis:(.+?)(?:\n\n|Code:|$)", stdout, re.DOTALL)
@@ -278,11 +259,7 @@ Format code changes as:
 
         return result
 
-    async def _apply_changes(
-        self,
-        parsed: Dict[str, Any],
-        worktree_path: Path
-    ) -> None:
+    async def _apply_changes(self, parsed: Dict[str, Any], worktree_path: Path) -> None:
         """
         Apply code changes to worktree.
 
@@ -308,19 +285,24 @@ Format code changes as:
 
             # Add all
             proc = await asyncio.create_subprocess_exec(
-                "git", "add", ".",
+                "git",
+                "add",
+                ".",
                 cwd=worktree_path,
                 stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL
+                stderr=asyncio.subprocess.DEVNULL,
             )
             await proc.wait()
 
             # Commit
             proc = await asyncio.create_subprocess_exec(
-                "git", "commit", "-m", message,
+                "git",
+                "commit",
+                "-m",
+                message,
                 cwd=worktree_path,
                 stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL
+                stderr=asyncio.subprocess.DEVNULL,
             )
             await proc.wait()
 
@@ -348,8 +330,9 @@ Format code changes as:
             input_tokens = tokens_used * 0.8
             output_tokens = tokens_used * 0.2
 
-            cost = (input_tokens / 1_000_000 * 0.075) + \
-                   (output_tokens / 1_000_000 * 0.30)
+            cost = (input_tokens / 1_000_000 * 0.075) + (
+                output_tokens / 1_000_000 * 0.30
+            )
             return round(cost, 3)
 
         # Fallback estimate
@@ -366,6 +349,7 @@ Format code changes as:
             Environment variables including API key
         """
         import os
+
         env = os.environ.copy()
 
         # Gemini specific env vars

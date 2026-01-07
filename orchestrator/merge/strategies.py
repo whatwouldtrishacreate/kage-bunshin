@@ -21,6 +21,7 @@ from .detector import ConflictDetector, ConflictInfo
 @dataclass
 class MergeResult:
     """Result of a merge operation."""
+
     success: bool
     strategy: str
     merged_files: List[str]
@@ -43,9 +44,7 @@ class MergeExecutor:
         self.detector = ConflictDetector(project_dir)
 
     def merge_theirs(
-        self,
-        source_branch: str,
-        commit_message: Optional[str] = None
+        self, source_branch: str, commit_message: Optional[str] = None
     ) -> MergeResult:
         """
         THEIRS strategy: Accept source branch unconditionally.
@@ -64,12 +63,7 @@ class MergeExecutor:
             merged_files = self._get_changed_files(source_branch)
 
             # Perform merge with theirs strategy
-            merge_cmd = [
-                "git", "merge",
-                "-X", "theirs",
-                "--no-edit",
-                source_branch
-            ]
+            merge_cmd = ["git", "merge", "-X", "theirs", "--no-edit", source_branch]
 
             if commit_message:
                 merge_cmd.extend(["-m", commit_message])
@@ -79,7 +73,7 @@ class MergeExecutor:
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
 
             # Get commit hash
@@ -88,7 +82,7 @@ class MergeExecutor:
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             commit_hash = commit_hash_result.stdout.strip()
 
@@ -98,7 +92,7 @@ class MergeExecutor:
                 merged_files=list(merged_files),
                 conflicts=[],
                 commit_hash=commit_hash,
-                message=f"Successfully merged {len(merged_files)} files using THEIRS strategy"
+                message=f"Successfully merged {len(merged_files)} files using THEIRS strategy",
             )
 
         except subprocess.CalledProcessError as e:
@@ -107,13 +101,11 @@ class MergeExecutor:
                 strategy="theirs",
                 merged_files=[],
                 conflicts=[],
-                message=f"Merge failed: {e.stderr}"
+                message=f"Merge failed: {e.stderr}",
             )
 
     def merge_auto(
-        self,
-        source_branch: str,
-        commit_message: Optional[str] = None
+        self, source_branch: str, commit_message: Optional[str] = None
     ) -> MergeResult:
         """
         AUTO strategy: Merge if no conflicts, fail otherwise.
@@ -129,8 +121,7 @@ class MergeExecutor:
         """
         # Check for conflicts first
         can_merge, conflicting_files = self.detector.try_merge_check(
-            source_branch,
-            self.base_branch
+            source_branch, self.base_branch
         )
 
         if not can_merge:
@@ -139,7 +130,7 @@ class MergeExecutor:
                 strategy="auto",
                 merged_files=[],
                 conflicts=conflicting_files,
-                message=f"Auto-merge blocked: {len(conflicting_files)} conflicts detected"
+                message=f"Auto-merge blocked: {len(conflicting_files)} conflicts detected",
             )
 
         # No conflicts - perform merge
@@ -155,7 +146,7 @@ class MergeExecutor:
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
 
             # Get commit hash
@@ -164,7 +155,7 @@ class MergeExecutor:
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             commit_hash = commit_hash_result.stdout.strip()
 
@@ -174,7 +165,7 @@ class MergeExecutor:
                 merged_files=list(merged_files),
                 conflicts=[],
                 commit_hash=commit_hash,
-                message=f"Successfully auto-merged {len(merged_files)} files (no conflicts)"
+                message=f"Successfully auto-merged {len(merged_files)} files (no conflicts)",
             )
 
         except subprocess.CalledProcessError as e:
@@ -183,13 +174,10 @@ class MergeExecutor:
                 strategy="auto",
                 merged_files=[],
                 conflicts=[],
-                message=f"Merge failed: {e.stderr}"
+                message=f"Merge failed: {e.stderr}",
             )
 
-    def merge_manual(
-        self,
-        source_branch: str
-    ) -> MergeResult:
+    def merge_manual(self, source_branch: str) -> MergeResult:
         """
         MANUAL strategy: Detect conflicts and prepare for manual resolution.
 
@@ -203,8 +191,7 @@ class MergeExecutor:
         """
         # Check for conflicts
         can_merge, conflicting_files = self.detector.try_merge_check(
-            source_branch,
-            self.base_branch
+            source_branch, self.base_branch
         )
 
         merged_files = self._get_changed_files(source_branch)
@@ -215,7 +202,7 @@ class MergeExecutor:
                 strategy="manual",
                 merged_files=list(merged_files),
                 conflicts=[],
-                message="Manual merge requested but no conflicts detected. Use AUTO or THEIRS strategy instead."
+                message="Manual merge requested but no conflicts detected. Use AUTO or THEIRS strategy instead.",
             )
         else:
             return MergeResult(
@@ -223,7 +210,7 @@ class MergeExecutor:
                 strategy="manual",
                 merged_files=list(merged_files),
                 conflicts=conflicting_files,
-                message=f"Manual resolution required for {len(conflicting_files)} conflicts"
+                message=f"Manual resolution required for {len(conflicting_files)} conflicts",
             )
 
     def _get_changed_files(self, source_branch: str) -> List[str]:
@@ -234,7 +221,7 @@ class MergeExecutor:
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             files = [f.strip() for f in result.stdout.split("\n") if f.strip()]
             return files

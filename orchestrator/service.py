@@ -17,16 +17,13 @@ from pathlib import Path
 from typing import Dict, Optional
 from uuid import UUID
 
-from .execution.parallel import ParallelExecutor, ParallelTaskConfig, AggregatedResult
-from .execution.adapters import (
-    TaskAssignment,
-    AutoClaudeAdapter,
-    OllamaAdapter,
-    ClaudeCodeAdapter,
-    GeminiAdapter,
-)
+from api.models import CLIAssignment, TaskDB, TaskStatus
 from storage.database import DatabaseManager
-from api.models import TaskDB, TaskStatus, CLIAssignment
+
+from .execution.adapters import (AutoClaudeAdapter, ClaudeCodeAdapter,
+                                 GeminiAdapter, OllamaAdapter, TaskAssignment)
+from .execution.parallel import (AggregatedResult, ParallelExecutor,
+                                 ParallelTaskConfig)
 
 
 class OrchestratorService:
@@ -41,10 +38,7 @@ class OrchestratorService:
     """
 
     def __init__(
-        self,
-        project_dir: Path,
-        database: DatabaseManager,
-        base_branch: str = "main"
+        self, project_dir: Path, database: DatabaseManager, base_branch: str = "main"
     ):
         """
         Initialize orchestrator service.
@@ -68,9 +62,7 @@ class OrchestratorService:
 
         # Initialize parallel executor
         self.executor = ParallelExecutor(
-            project_dir=project_dir,
-            adapters=self.adapters,
-            base_branch=base_branch
+            project_dir=project_dir, adapters=self.adapters, base_branch=base_branch
         )
 
         # Track running tasks (task_id → asyncio.Task)
@@ -82,7 +74,7 @@ class OrchestratorService:
         cli_assignments: list[CLIAssignment],
         max_retries: int = 3,
         retry_delay: float = 5.0,
-        created_by: Optional[str] = None
+        created_by: Optional[str] = None,
     ) -> TaskDB:
         """
         Submit a new task for parallel execution.
@@ -106,7 +98,7 @@ class OrchestratorService:
                 cli_name=a.cli_name,
                 description=description,
                 context=a.context,
-                timeout=a.timeout
+                timeout=a.timeout,
             )
             for a in cli_assignments
         ]
@@ -118,7 +110,7 @@ class OrchestratorService:
             assignments=task_assignments,
             max_retries=max_retries,
             retry_delay=retry_delay,
-            use_exponential_backoff=True
+            use_exponential_backoff=True,
         )
 
         # Serialize config for database
@@ -129,20 +121,18 @@ class OrchestratorService:
                     "cli_name": a.cli_name,
                     "description": a.description,
                     "context": a.context,
-                    "timeout": a.timeout
+                    "timeout": a.timeout,
                 }
                 for a in task_assignments
             ],
             "max_retries": max_retries,
             "retry_delay": retry_delay,
-            "use_exponential_backoff": True
+            "use_exponential_backoff": True,
         }
 
         # Create task in database
         task = await self.database.create_task(
-            description=description,
-            config=config_dict,
-            created_by=created_by
+            description=description, config=config_dict, created_by=created_by
         )
 
         # Update task IDs in config
@@ -151,18 +141,12 @@ class OrchestratorService:
             assignment.task_id = str(task.id)
 
         # Start execution in background
-        execution_task = asyncio.create_task(
-            self._execute_task(task.id, config)
-        )
+        execution_task = asyncio.create_task(self._execute_task(task.id, config))
         self._running_tasks[task.id] = execution_task
 
         return task
 
-    async def _execute_task(
-        self,
-        task_id: UUID,
-        config: ParallelTaskConfig
-    ):
+    async def _execute_task(self, task_id: UUID, config: ParallelTaskConfig):
         """
         Execute task in background.
 
@@ -175,9 +159,7 @@ class OrchestratorService:
         try:
             # Update status to running
             await self.database.update_task_status(
-                task_id=task_id,
-                status=TaskStatus.RUNNING,
-                started_at=datetime.now()
+                task_id=task_id, status=TaskStatus.RUNNING, started_at=datetime.now()
             )
 
             # Log progress event
@@ -186,7 +168,7 @@ class OrchestratorService:
                 cli_name="orchestrator",
                 session_id=str(task_id),
                 status="working",
-                message=f"Starting parallel execution across {len(config.assignments)} CLIs"
+                message=f"Starting parallel execution across {len(config.assignments)} CLIs",
             )
 
             # Execute in parallel using Week 2 executor
@@ -195,9 +177,13 @@ class OrchestratorService:
             # Store result in database
             await self.database.update_task_status(
                 task_id=task_id,
-                status=TaskStatus.COMPLETED if result.success_count > 0 else TaskStatus.FAILED,
+                status=(
+                    TaskStatus.COMPLETED
+                    if result.success_count > 0
+                    else TaskStatus.FAILED
+                ),
                 completed_at=datetime.now(),
-                result=result.to_dict()
+                result=result.to_dict(),
             )
 
             # Log completion event
@@ -208,7 +194,7 @@ class OrchestratorService:
                 status="done",
                 message=f"Completed: {result.success_count}/{len(config.assignments)} CLIs succeeded",
                 cost=result.total_cost,
-                duration=result.total_duration
+                duration=result.total_duration,
             )
 
         except Exception as e:
@@ -217,7 +203,7 @@ class OrchestratorService:
                 task_id=task_id,
                 status=TaskStatus.FAILED,
                 completed_at=datetime.now(),
-                error=str(e)
+                error=str(e),
             )
 
             # Log error event
@@ -226,7 +212,7 @@ class OrchestratorService:
                 cli_name="orchestrator",
                 session_id=str(task_id),
                 status="failed",
-                message=f"Execution failed: {str(e)}"
+                message=f"Execution failed: {str(e)}",
             )
 
         finally:
@@ -246,10 +232,7 @@ class OrchestratorService:
         return await self.database.get_task(task_id)
 
     async def list_tasks(
-        self,
-        status: Optional[TaskStatus] = None,
-        page: int = 1,
-        page_size: int = 50
+        self, status: Optional[TaskStatus] = None, page: int = 1, page_size: int = 50
     ) -> tuple[list[TaskDB], int]:
         """
         List tasks with pagination.
@@ -264,9 +247,7 @@ class OrchestratorService:
         """
         offset = (page - 1) * page_size
         tasks = await self.database.list_tasks(
-            status=status,
-            limit=page_size,
-            offset=offset
+            status=status, limit=page_size, offset=offset
         )
         total = await self.database.count_tasks(status=status)
         return tasks, total
@@ -293,7 +274,7 @@ class OrchestratorService:
             task_id=task_id,
             status=TaskStatus.CANCELLED,
             completed_at=datetime.now(),
-            error="Cancelled by user"
+            error="Cancelled by user",
         )
 
         # Log event
@@ -302,7 +283,7 @@ class OrchestratorService:
             cli_name="orchestrator",
             session_id=str(task_id),
             status="failed",
-            message="Task cancelled by user"
+            message="Task cancelled by user",
         )
 
         return True

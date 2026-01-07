@@ -33,23 +33,25 @@ Usage:
 import asyncio
 import fcntl
 import os
-from dataclasses import dataclass, asdict
+from collections import defaultdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, List, Set
-from collections import defaultdict
+from typing import Dict, List, Optional, Set
 
 from .worktree import SessionWorktree
 
 
 class LockError(Exception):
     """Error during lock operations."""
+
     pass
 
 
 @dataclass
 class LockInfo:
     """Information about a file lock."""
+
     session_id: str
     cli_name: str
     file_path: Path
@@ -172,7 +174,9 @@ class LockManager:
                 pass  # Already closed
         return False
 
-    async def release_file_lock(self, session: SessionWorktree, file_path: Path) -> bool:
+    async def release_file_lock(
+        self, session: SessionWorktree, file_path: Path
+    ) -> bool:
         """
         Release fcntl lock on a file.
 

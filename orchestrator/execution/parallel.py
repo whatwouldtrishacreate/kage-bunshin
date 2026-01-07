@@ -22,25 +22,22 @@ Execution flow:
 """
 
 import asyncio
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
 
-from ..state.worktree import WorktreeManager, SessionWorktree
-from ..state.locks import LockManager
 from ..state.context import ContextManager
-from .adapters import (
-    CLIAdapter,
-    TaskAssignment,
-    ExecutionResult,
-    ExecutionStatus,
-)
+from ..state.locks import LockManager
+from ..state.worktree import SessionWorktree, WorktreeManager
+from .adapters import (CLIAdapter, ExecutionResult, ExecutionStatus,
+                       TaskAssignment)
 
 
 @dataclass
 class ParallelTaskConfig:
     """Configuration for parallel task execution."""
+
     task_id: str
     description: str
     assignments: List[TaskAssignment]  # One per CLI
@@ -52,6 +49,7 @@ class ParallelTaskConfig:
 @dataclass
 class AggregatedResult:
     """Aggregated results from parallel CLI execution."""
+
     task_id: str
     cli_results: List[ExecutionResult]
     success_count: int
@@ -91,7 +89,7 @@ class ParallelExecutor:
         self,
         project_dir: Path,
         adapters: Dict[str, CLIAdapter],
-        base_branch: str = "main"
+        base_branch: str = "main",
     ):
         """
         Initialize parallel executor.
@@ -117,10 +115,7 @@ class ParallelExecutor:
         self._total_executions = 0
         self._total_cost = 0.0
 
-    async def execute_parallel(
-        self,
-        config: ParallelTaskConfig
-    ) -> AggregatedResult:
+    async def execute_parallel(self, config: ParallelTaskConfig) -> AggregatedResult:
         """
         Execute task in parallel across multiple CLIs.
 
@@ -137,31 +132,34 @@ class ParallelExecutor:
 
         try:
             # Execute in parallel with retries
-            results = await asyncio.gather(*[
-                self._execute_with_retry(
-                    session=session,
-                    task=task,
-                    adapter=self.adapters[task.cli_name],
-                    max_retries=config.max_retries,
-                    retry_delay=config.retry_delay,
-                    use_backoff=config.use_exponential_backoff
-                )
-                for session, task in zip(sessions, config.assignments)
-            ], return_exceptions=True)
+            results = await asyncio.gather(
+                *[
+                    self._execute_with_retry(
+                        session=session,
+                        task=task,
+                        adapter=self.adapters[task.cli_name],
+                        max_retries=config.max_retries,
+                        retry_delay=config.retry_delay,
+                        use_backoff=config.use_exponential_backoff,
+                    )
+                    for session, task in zip(sessions, config.assignments)
+                ],
+                return_exceptions=True,
+            )
 
             # Handle any exceptions that occurred
             results = [
-                self._handle_exception(config.assignments[i], r)
-                if isinstance(r, Exception)
-                else r
+                (
+                    self._handle_exception(config.assignments[i], r)
+                    if isinstance(r, Exception)
+                    else r
+                )
                 for i, r in enumerate(results)
             ]
 
             # Aggregate results
             aggregated = self._aggregate_results(
-                task_id=config.task_id,
-                results=results,
-                start_time=start_time
+                task_id=config.task_id, results=results, start_time=start_time
             )
 
             # Update stats
@@ -175,8 +173,7 @@ class ParallelExecutor:
             await self._cleanup_sessions(sessions)
 
     async def _create_sessions(
-        self,
-        config: ParallelTaskConfig
+        self, config: ParallelTaskConfig
     ) -> List[SessionWorktree]:
         """
         Create isolated worktrees for each CLI.
@@ -194,16 +191,14 @@ class ParallelExecutor:
 
             # Create worktree
             session = await self.worktree_manager.create_session_worktree(
-                session_id=session_id,
-                cli_name=task.cli_name,
-                task_id=config.task_id
+                session_id=session_id, cli_name=task.cli_name, task_id=config.task_id
             )
 
             # Initialize context
             await self.context_manager.update_context(
                 session=session,
                 status="working",
-                message=f"Starting task: {config.description}"
+                message=f"Starting task: {config.description}",
             )
 
             sessions.append(session)
@@ -217,7 +212,7 @@ class ParallelExecutor:
         adapter: CLIAdapter,
         max_retries: int,
         retry_delay: float,
-        use_backoff: bool
+        use_backoff: bool,
     ) -> ExecutionResult:
         """
         Execute task with retry logic.
@@ -241,7 +236,7 @@ class ParallelExecutor:
                 await self.context_manager.update_context(
                     session=session,
                     status="working",
-                    message=f"Attempt {retries + 1}/{max_retries + 1}"
+                    message=f"Attempt {retries + 1}/{max_retries + 1}",
                 )
 
                 # Execute
@@ -269,7 +264,7 @@ class ParallelExecutor:
                     await self.context_manager.update_context(
                         session=session,
                         status="blocked",
-                        message=f"Retrying in {delay}s after {result.status.value}"
+                        message=f"Retrying in {delay}s after {result.status.value}",
                     )
 
                     # Wait before retry
@@ -283,7 +278,11 @@ class ParallelExecutor:
                 # Unexpected error during execution
                 if retries < max_retries:
                     retries += 1
-                    delay = retry_delay * (2 ** (retries - 1)) if use_backoff else retry_delay
+                    delay = (
+                        retry_delay * (2 ** (retries - 1))
+                        if use_backoff
+                        else retry_delay
+                    )
                     await asyncio.sleep(delay)
                 else:
                     # Return failure result
@@ -293,7 +292,7 @@ class ParallelExecutor:
                         status=ExecutionStatus.FAILURE,
                         output="",
                         error=str(e),
-                        retries=retries
+                        retries=retries,
                     )
 
         # Should never reach here, but just in case
@@ -303,7 +302,7 @@ class ParallelExecutor:
             status=ExecutionStatus.FAILURE,
             output="",
             error="Max retries exceeded",
-            retries=retries
+            retries=retries,
         )
 
     def _should_retry(self, result: ExecutionResult) -> bool:
@@ -342,9 +341,7 @@ class ParallelExecutor:
         return False
 
     def _handle_exception(
-        self,
-        task: TaskAssignment,
-        exception: Exception
+        self, task: TaskAssignment, exception: Exception
     ) -> ExecutionResult:
         """
         Handle exception that occurred during execution.
@@ -362,14 +359,11 @@ class ParallelExecutor:
             status=ExecutionStatus.FAILURE,
             output="",
             error=f"Exception: {str(exception)}",
-            retries=0
+            retries=0,
         )
 
     def _aggregate_results(
-        self,
-        task_id: str,
-        results: List[ExecutionResult],
-        start_time: datetime
+        self, task_id: str, results: List[ExecutionResult], start_time: datetime
     ) -> AggregatedResult:
         """
         Aggregate results from parallel execution.
@@ -403,7 +397,7 @@ class ParallelExecutor:
             failure_count=failure_count,
             total_cost=total_cost,
             total_duration=total_duration,
-            best_result=best
+            best_result=best,
         )
 
     async def _cleanup_sessions(self, sessions: List[SessionWorktree]) -> None:
@@ -442,7 +436,6 @@ class ParallelExecutor:
                 else 0.0
             ),
             "adapter_stats": {
-                name: adapter.get_stats()
-                for name, adapter in self.adapters.items()
-            }
+                name: adapter.get_stats() for name, adapter in self.adapters.items()
+            },
         }

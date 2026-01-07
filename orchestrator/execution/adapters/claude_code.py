@@ -24,17 +24,11 @@ import json
 import re
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
-from .base import (
-    CLIAdapter,
-    TaskAssignment,
-    ExecutionResult,
-    ExecutionStatus,
-    CLIExecutionError,
-    CLINotFoundError,
-    CLITimeoutError,
-)
+from .base import (CLIAdapter, CLIExecutionError, CLINotFoundError,
+                   CLITimeoutError, ExecutionResult, ExecutionStatus,
+                   TaskAssignment)
 
 
 class ClaudeCodeAdapter(CLIAdapter):
@@ -50,9 +44,7 @@ class ClaudeCodeAdapter(CLIAdapter):
         super().__init__("claude-code")
 
     async def execute(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> ExecutionResult:
         """
         Execute task using Claude Code.
@@ -70,8 +62,8 @@ class ClaudeCodeAdapter(CLIAdapter):
         Returns:
             ExecutionResult with status and output
         """
-        from datetime import datetime
         import asyncio
+        from datetime import datetime
 
         start_time = datetime.now()
 
@@ -119,7 +111,7 @@ class ClaudeCodeAdapter(CLIAdapter):
                 commits=commits,
                 cost=cost,
                 duration=duration,
-                retries=0
+                retries=0,
             )
 
         except asyncio.TimeoutError:
@@ -131,7 +123,7 @@ class ClaudeCodeAdapter(CLIAdapter):
                 output="",
                 error=f"Claude Code execution timed out after {task.timeout}s",
                 cost=0.0,
-                duration=duration
+                duration=duration,
             )
 
         except Exception as e:
@@ -143,7 +135,7 @@ class ClaudeCodeAdapter(CLIAdapter):
                 output="",
                 error=str(e),
                 cost=0.0,
-                duration=duration
+                duration=duration,
             )
 
     def _build_prompt(self, task: TaskAssignment) -> str:
@@ -174,9 +166,7 @@ Please proceed with implementing this task.
         return prompt
 
     def _construct_command(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> List[str]:
         """
         Construct Claude Code command.
@@ -193,18 +183,10 @@ Please proceed with implementing this task.
         Returns:
             Command as list of strings
         """
-        return [
-            "claude",
-            "--print",
-            "--no-session-persistence"
-        ]
+        return ["claude", "--print", "--no-session-persistence"]
 
     async def _run_subprocess_with_stdin(
-        self,
-        command: List[str],
-        cwd: Path,
-        timeout: int,
-        stdin_content: str
+        self, command: List[str], cwd: Path, timeout: int, stdin_content: str
     ) -> tuple[str, str, int]:
         """
         Run command as async subprocess with stdin input.
@@ -230,19 +212,18 @@ Please proceed with implementing this task.
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=self._get_env_vars()
+                env=self._get_env_vars(),
             )
 
             # Write prompt to stdin and communicate
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=stdin_content.encode('utf-8')),
-                timeout=timeout
+                proc.communicate(input=stdin_content.encode("utf-8")), timeout=timeout
             )
 
             return (
-                stdout.decode('utf-8', errors='replace'),
-                stderr.decode('utf-8', errors='replace'),
-                proc.returncode
+                stdout.decode("utf-8", errors="replace"),
+                stderr.decode("utf-8", errors="replace"),
+                proc.returncode,
             )
 
         except asyncio.TimeoutError:
@@ -276,7 +257,7 @@ Please proceed with implementing this task.
             "files_touched": [],
             "commits_made": [],
             "tokens_used": 0,
-            "errors": []
+            "errors": [],
         }
 
         # Extract tool use information
@@ -334,8 +315,7 @@ Please proceed with implementing this task.
             input_tokens = tokens_used * 0.8
             output_tokens = tokens_used * 0.2
 
-            cost = (input_tokens / 1_000_000 * 3.0) + \
-                   (output_tokens / 1_000_000 * 15.0)
+            cost = (input_tokens / 1_000_000 * 3.0) + (output_tokens / 1_000_000 * 15.0)
             return round(cost, 2)
 
         # Fallback estimate based on tool uses
@@ -355,6 +335,7 @@ Please proceed with implementing this task.
             Environment variables including OAuth token
         """
         import os
+
         env = os.environ.copy()
 
         # Claude Code specific env vars

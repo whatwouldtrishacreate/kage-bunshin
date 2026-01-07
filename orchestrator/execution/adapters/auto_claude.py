@@ -23,17 +23,11 @@ Cost Model:
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
-from .base import (
-    CLIAdapter,
-    TaskAssignment,
-    ExecutionResult,
-    ExecutionStatus,
-    CLIExecutionError,
-    CLINotFoundError,
-    CLITimeoutError,
-)
+from .base import (CLIAdapter, CLIExecutionError, CLINotFoundError,
+                   CLITimeoutError, ExecutionResult, ExecutionStatus,
+                   TaskAssignment)
 
 
 class AutoClaudeAdapter(CLIAdapter):
@@ -65,13 +59,11 @@ class AutoClaudeAdapter(CLIAdapter):
             raise CLINotFoundError(
                 f"Auto-Claude not found at {auto_claude_path}",
                 cli_name="auto-claude",
-                task_id="init"
+                task_id="init",
             )
 
     async def execute(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> ExecutionResult:
         """
         Execute task using Auto-Claude.
@@ -133,7 +125,7 @@ class AutoClaudeAdapter(CLIAdapter):
                 commits=commits,
                 cost=cost,
                 duration=duration,
-                retries=0
+                retries=0,
             )
 
         except asyncio.TimeoutError:
@@ -145,7 +137,7 @@ class AutoClaudeAdapter(CLIAdapter):
                 output="",
                 error=f"Execution timed out after {task.timeout}s",
                 cost=0.0,
-                duration=duration
+                duration=duration,
             )
 
         except Exception as e:
@@ -157,14 +149,10 @@ class AutoClaudeAdapter(CLIAdapter):
                 output="",
                 error=str(e),
                 cost=0.0,
-                duration=duration
+                duration=duration,
             )
 
-    async def _create_spec(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
-    ) -> str:
+    async def _create_spec(self, task: TaskAssignment, worktree_path: Path) -> str:
         """
         Create Auto-Claude spec from task description.
 
@@ -179,8 +167,10 @@ class AutoClaudeAdapter(CLIAdapter):
         command = [
             "python3",
             str(self.backend_path / "spec_runner.py"),
-            "--task", task.description,
-            "--complexity", task.context.get("complexity", "simple")
+            "--task",
+            task.description,
+            "--complexity",
+            task.context.get("complexity", "simple"),
         ]
 
         stdout, stderr, returncode = await self._run_subprocess(
@@ -193,7 +183,7 @@ class AutoClaudeAdapter(CLIAdapter):
                 cli_name=self.cli_name,
                 task_id=task.task_id,
                 returncode=returncode,
-                stderr=stderr
+                stderr=stderr,
             )
 
         # Extract spec ID from output
@@ -206,10 +196,7 @@ class AutoClaudeAdapter(CLIAdapter):
         return task.task_id.split("-")[0] if "-" in task.task_id else "001"
 
     async def _run_build(
-        self,
-        spec_id: str,
-        worktree_path: Path,
-        timeout: int
+        self, spec_id: str, worktree_path: Path, timeout: int
     ) -> tuple[str, str, int]:
         """
         Run Auto-Claude autonomous build.
@@ -222,18 +209,12 @@ class AutoClaudeAdapter(CLIAdapter):
         Returns:
             Tuple of (stdout, stderr, returncode)
         """
-        command = [
-            "python3",
-            str(self.backend_path / "run.py"),
-            "--spec", spec_id
-        ]
+        command = ["python3", str(self.backend_path / "run.py"), "--spec", spec_id]
 
         return await self._run_subprocess(command, worktree_path, timeout)
 
     def _construct_command(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> List[str]:
         """
         Construct Auto-Claude command.
@@ -242,11 +223,7 @@ class AutoClaudeAdapter(CLIAdapter):
         two-step execution (create spec, then run). Kept for interface
         compliance.
         """
-        return [
-            "python3",
-            str(self.backend_path / "run.py"),
-            "--spec", task.task_id
-        ]
+        return ["python3", str(self.backend_path / "run.py"), "--spec", task.task_id]
 
     def _parse_output(self, stdout: str, stderr: str) -> Dict[str, Any]:
         """
@@ -269,7 +246,7 @@ class AutoClaudeAdapter(CLIAdapter):
             "success": False,
             "qa_passed": False,
             "phases_completed": [],
-            "errors": []
+            "errors": [],
         }
 
         # Check for success indicators
@@ -282,11 +259,9 @@ class AutoClaudeAdapter(CLIAdapter):
         # Extract phase information
         phase_matches = re.findall(r"Phase (\d+): (.+?) - (COMPLETE|FAILED)", stdout)
         for phase_num, phase_name, status in phase_matches:
-            result["phases_completed"].append({
-                "phase": int(phase_num),
-                "name": phase_name,
-                "status": status
-            })
+            result["phases_completed"].append(
+                {"phase": int(phase_num), "name": phase_name, "status": status}
+            )
 
         # Extract errors
         if stderr:
@@ -334,6 +309,7 @@ class AutoClaudeAdapter(CLIAdapter):
             Environment variables including API keys
         """
         import os
+
         env = os.environ.copy()
 
         # Auto-Claude specific env vars
@@ -350,6 +326,6 @@ class AutoClaudeAdapter(CLIAdapter):
         return env
 
 
+import asyncio
 # Import datetime for start_time
 from datetime import datetime
-import asyncio

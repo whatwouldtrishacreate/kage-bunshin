@@ -10,26 +10,18 @@ Endpoints:
 - DELETE /api/v1/tasks/{task_id} - Cancel task
 """
 
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from api.models import (
-    TaskSubmitRequest,
-    TaskResponse,
-    TaskListResponse,
-    TaskStatus,
-    ErrorResponse
-)
 from api.dependencies import get_orchestrator, verify_api_key
+from api.models import (ErrorResponse, TaskListResponse, TaskResponse,
+                        TaskStatus, TaskSubmitRequest)
 from orchestrator.service import OrchestratorService
 
-
 router = APIRouter(
-    prefix="/api/v1/tasks",
-    tags=["tasks"],
-    dependencies=[Depends(verify_api_key)]
+    prefix="/api/v1/tasks", tags=["tasks"], dependencies=[Depends(verify_api_key)]
 )
 
 
@@ -48,12 +40,12 @@ router = APIRouter(
 
     The task will be queued and executed asynchronously. Use the returned task ID
     to track progress via the SSE endpoint or poll the status endpoint.
-    """
+    """,
 )
 async def submit_task(
     request: TaskSubmitRequest,
     orchestrator: OrchestratorService = Depends(get_orchestrator),
-    api_key: str = Depends(verify_api_key)
+    api_key: str = Depends(verify_api_key),
 ) -> TaskResponse:
     """Submit a new task for parallel execution."""
     try:
@@ -62,14 +54,14 @@ async def submit_task(
             cli_assignments=request.cli_assignments,
             max_retries=request.max_retries,
             retry_delay=request.retry_delay,
-            created_by=request.created_by or f"api-key-{api_key[:8]}"
+            created_by=request.created_by or f"api-key-{api_key[:8]}",
         )
         return task.to_response()
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to submit task: {str(e)}"
+            detail=f"Failed to submit task: {str(e)}",
         )
 
 
@@ -85,33 +77,33 @@ async def submit_task(
     List all tasks with optional status filtering and pagination.
 
     Use query parameters to filter by status and paginate results.
-    """
+    """,
 )
 async def list_tasks(
-    status_filter: Optional[TaskStatus] = Query(None, alias="status", description="Filter by task status"),
+    status_filter: Optional[TaskStatus] = Query(
+        None, alias="status", description="Filter by task status"
+    ),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(50, ge=1, le=100, description="Items per page"),
-    orchestrator: OrchestratorService = Depends(get_orchestrator)
+    orchestrator: OrchestratorService = Depends(get_orchestrator),
 ) -> TaskListResponse:
     """List tasks with optional filtering."""
     try:
         tasks, total = await orchestrator.list_tasks(
-            status=status_filter,
-            page=page,
-            page_size=page_size
+            status=status_filter, page=page, page_size=page_size
         )
 
         return TaskListResponse(
             tasks=[task.to_response() for task in tasks],
             total=total,
             page=page,
-            page_size=page_size
+            page_size=page_size,
         )
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list tasks: {str(e)}"
+            detail=f"Failed to list tasks: {str(e)}",
         )
 
 
@@ -127,19 +119,17 @@ async def list_tasks(
     description="""
     Get detailed information about a specific task including status,
     execution results, and any errors.
-    """
+    """,
 )
 async def get_task(
-    task_id: UUID,
-    orchestrator: OrchestratorService = Depends(get_orchestrator)
+    task_id: UUID, orchestrator: OrchestratorService = Depends(get_orchestrator)
 ) -> TaskResponse:
     """Get task by ID."""
     task = await orchestrator.get_task(task_id)
 
     if not task:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Task {task_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
         )
 
     return task.to_response()
@@ -159,26 +149,24 @@ async def get_task(
     Cancel a task that is currently running or pending.
 
     Completed or failed tasks cannot be cancelled.
-    """
+    """,
 )
 async def cancel_task(
-    task_id: UUID,
-    orchestrator: OrchestratorService = Depends(get_orchestrator)
+    task_id: UUID, orchestrator: OrchestratorService = Depends(get_orchestrator)
 ) -> dict:
     """Cancel a running task."""
     # Check task exists
     task = await orchestrator.get_task(task_id)
     if not task:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Task {task_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
         )
 
     # Check task is cancellable
     if task.status not in [TaskStatus.PENDING, TaskStatus.RUNNING]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Task {task_id} is {task.status.value} and cannot be cancelled"
+            detail=f"Task {task_id} is {task.status.value} and cannot be cancelled",
         )
 
     # Attempt to cancel
@@ -187,13 +175,13 @@ async def cancel_task(
     if not cancelled:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Task {task_id} could not be cancelled (not currently running)"
+            detail=f"Task {task_id} could not be cancelled (not currently running)",
         )
 
     return {
         "message": f"Task {task_id} cancelled successfully",
         "task_id": str(task_id),
-        "status": "cancelled"
+        "status": "cancelled",
     }
 
 
@@ -205,10 +193,10 @@ async def cancel_task(
         403: {"model": ErrorResponse, "description": "Forbidden"},
     },
     summary="Get orchestrator statistics",
-    description="Get runtime statistics about the orchestrator and CLI adapters."
+    description="Get runtime statistics about the orchestrator and CLI adapters.",
 )
 async def get_stats(
-    orchestrator: OrchestratorService = Depends(get_orchestrator)
+    orchestrator: OrchestratorService = Depends(get_orchestrator),
 ) -> dict:
     """Get orchestrator statistics."""
     return orchestrator.get_stats()

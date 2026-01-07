@@ -16,18 +16,19 @@ Test scenarios:
 """
 
 import asyncio
-import pytest
-import tempfile
 import shutil
-from pathlib import Path
-from datetime import datetime
-
 import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from orchestrator.state.worktree import WorktreeManager, SessionWorktree
-from orchestrator.state.locks import LockManager, LockError
-from orchestrator.state.context import ContextManager, ContextFile
+from orchestrator.state.context import ContextFile, ContextManager
+from orchestrator.state.locks import LockError, LockManager
+from orchestrator.state.worktree import SessionWorktree, WorktreeManager
 
 
 @pytest.fixture
@@ -39,6 +40,7 @@ def temp_git_repo():
 
         # Initialize git repo
         import subprocess
+
         subprocess.run(["git", "init"], cwd=repo_path, check=True)
         subprocess.run(
             ["git", "config", "user.name", "Test User"],
@@ -210,18 +212,24 @@ class TestLockManager:
         file_path = Path("src/api.py")
 
         # Session1 acquires lock
-        acquired1 = await lock_manager.acquire_file_lock(session1, file_path, timeout=1.0)
+        acquired1 = await lock_manager.acquire_file_lock(
+            session1, file_path, timeout=1.0
+        )
         assert acquired1 is True
 
         # Session2 tries to acquire (should timeout)
-        acquired2 = await lock_manager.acquire_file_lock(session2, file_path, timeout=1.0)
+        acquired2 = await lock_manager.acquire_file_lock(
+            session2, file_path, timeout=1.0
+        )
         assert acquired2 is False
 
         # Release session1's lock
         await lock_manager.release_file_lock(session1, file_path)
 
         # Now session2 can acquire
-        acquired2 = await lock_manager.acquire_file_lock(session2, file_path, timeout=1.0)
+        acquired2 = await lock_manager.acquire_file_lock(
+            session2, file_path, timeout=1.0
+        )
         assert acquired2 is True
 
         # Cleanup

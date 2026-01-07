@@ -10,27 +10,21 @@ Endpoints:
 - GET /api/v1/tasks/{task_id}/conflicts - Check for merge conflicts
 """
 
-from uuid import UUID
 from pathlib import Path
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.models import (
-    MergeRequest,
-    MergeResultResponse,
-    MergeStrategy,
-    ErrorResponse
-)
-from api.dependencies import get_database, get_orchestrator, verify_api_key, PROJECT_DIR, BASE_BRANCH
-from storage.database import DatabaseManager
-from orchestrator.service import OrchestratorService
+from api.dependencies import (BASE_BRANCH, PROJECT_DIR, get_database,
+                              get_orchestrator, verify_api_key)
+from api.models import (ErrorResponse, MergeRequest, MergeResultResponse,
+                        MergeStrategy)
 from orchestrator.merge import MergeExecutor
-
+from orchestrator.service import OrchestratorService
+from storage.database import DatabaseManager
 
 router = APIRouter(
-    prefix="/api/v1/tasks",
-    tags=["merge"],
-    dependencies=[Depends(verify_api_key)]
+    prefix="/api/v1/tasks", tags=["merge"], dependencies=[Depends(verify_api_key)]
 )
 
 
@@ -51,29 +45,28 @@ router = APIRouter(
     - **THEIRS**: Accept best result automatically (no conflict check)
     - **AUTO**: Auto-merge if no conflicts, fail otherwise
     - **MANUAL**: Detect conflicts and require manual resolution
-    """
+    """,
 )
 async def merge_task(
     task_id: UUID,
     strategy: MergeStrategy,
     cli_name: str = None,
     database: DatabaseManager = Depends(get_database),
-    orchestrator: OrchestratorService = Depends(get_orchestrator)
+    orchestrator: OrchestratorService = Depends(get_orchestrator),
 ) -> MergeResultResponse:
     """Merge task results into main branch."""
     # Get task
     task = await database.get_task(task_id)
     if not task:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Task {task_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
         )
 
     # Check task is completed
     if task.status != "completed":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Task {task_id} is {task.status}, must be completed to merge"
+            detail=f"Task {task_id} is {task.status}, must be completed to merge",
         )
 
     # Get best result CLI name (or use specified)
@@ -81,7 +74,7 @@ async def merge_task(
         if not task.result or not task.result.get("best_result"):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Task {task_id} has no successful results to merge"
+                detail=f"Task {task_id} has no successful results to merge",
             )
         cli_name = task.result["best_result"]["cli_name"]
 
@@ -97,19 +90,19 @@ async def merge_task(
         if strategy == MergeStrategy.THEIRS:
             result = merger.merge_theirs(
                 source_branch=source_branch,
-                commit_message=f"Merge task {task_id} results from {cli_name} 🥷"
+                commit_message=f"Merge task {task_id} results from {cli_name} 🥷",
             )
         elif strategy == MergeStrategy.AUTO:
             result = merger.merge_auto(
                 source_branch=source_branch,
-                commit_message=f"Auto-merge task {task_id} results from {cli_name} 🥷"
+                commit_message=f"Auto-merge task {task_id} results from {cli_name} 🥷",
             )
         elif strategy == MergeStrategy.MANUAL:
             result = merger.merge_manual(source_branch=source_branch)
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid merge strategy: {strategy}"
+                detail=f"Invalid merge strategy: {strategy}",
             )
 
         return MergeResultResponse(
@@ -119,13 +112,13 @@ async def merge_task(
             merged_files=result.merged_files,
             conflicts=result.conflicts,
             commit_hash=result.commit_hash,
-            message=result.message
+            message=result.message,
         )
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Merge failed: {str(e)}"
+            detail=f"Merge failed: {str(e)}",
         )
 
 
@@ -142,27 +135,26 @@ async def merge_task(
     Check if merging this task's results would cause conflicts.
 
     Returns conflict information without performing the merge.
-    """
+    """,
 )
 async def check_conflicts(
     task_id: UUID,
     cli_name: str = None,
-    database: DatabaseManager = Depends(get_database)
+    database: DatabaseManager = Depends(get_database),
 ) -> dict:
     """Check for merge conflicts."""
     # Get task
     task = await database.get_task(task_id)
     if not task:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Task {task_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
         )
 
     # Check task is completed
     if task.status != "completed":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Task {task_id} is {task.status}, must be completed to check conflicts"
+            detail=f"Task {task_id} is {task.status}, must be completed to check conflicts",
         )
 
     # Get CLI name (best result or specified)
@@ -170,7 +162,7 @@ async def check_conflicts(
         if not task.result or not task.result.get("best_result"):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Task {task_id} has no successful results"
+                detail=f"Task {task_id} has no successful results",
             )
         cli_name = task.result["best_result"]["cli_name"]
 
@@ -191,11 +183,11 @@ async def check_conflicts(
             "can_auto_merge": result.success,
             "conflicts": result.conflicts,
             "files_changed": result.merged_files,
-            "message": result.message
+            "message": result.message,
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Conflict check failed: {str(e)}"
+            detail=f"Conflict check failed: {str(e)}",
         )

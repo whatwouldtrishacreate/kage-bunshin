@@ -23,17 +23,11 @@ Model: Qwen 2.5 Coder (32B or 14B depending on VRAM)
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
-from .base import (
-    CLIAdapter,
-    TaskAssignment,
-    ExecutionResult,
-    ExecutionStatus,
-    CLIExecutionError,
-    CLINotFoundError,
-    CLITimeoutError,
-)
+from .base import (CLIAdapter, CLIExecutionError, CLINotFoundError,
+                   CLITimeoutError, ExecutionResult, ExecutionStatus,
+                   TaskAssignment)
 
 
 class OllamaAdapter(CLIAdapter):
@@ -58,9 +52,7 @@ class OllamaAdapter(CLIAdapter):
         # This will be checked during first execution
 
     async def execute(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> ExecutionResult:
         """
         Execute task using Ollama.
@@ -79,8 +71,8 @@ class OllamaAdapter(CLIAdapter):
         Returns:
             ExecutionResult with status and output
         """
-        from datetime import datetime
         import asyncio
+        from datetime import datetime
 
         start_time = datetime.now()
 
@@ -127,7 +119,7 @@ class OllamaAdapter(CLIAdapter):
                 commits=commits,
                 cost=0.0,  # Local execution = $0
                 duration=duration,
-                retries=0
+                retries=0,
             )
 
         except asyncio.TimeoutError:
@@ -139,7 +131,7 @@ class OllamaAdapter(CLIAdapter):
                 output="",
                 error=f"Ollama execution timed out after {task.timeout}s",
                 cost=0.0,
-                duration=duration
+                duration=duration,
             )
 
         except Exception as e:
@@ -151,14 +143,10 @@ class OllamaAdapter(CLIAdapter):
                 output="",
                 error=str(e),
                 cost=0.0,
-                duration=duration
+                duration=duration,
             )
 
-    def _build_prompt(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
-    ) -> str:
+    def _build_prompt(self, task: TaskAssignment, worktree_path: Path) -> str:
         """
         Build prompt for Ollama model.
 
@@ -192,9 +180,7 @@ Explanation: <explanation>
         return prompt
 
     def _construct_command(
-        self,
-        task: TaskAssignment,
-        worktree_path: Path
+        self, task: TaskAssignment, worktree_path: Path
     ) -> List[str]:
         """
         Construct Ollama command.
@@ -208,12 +194,7 @@ Explanation: <explanation>
         """
         prompt = self._build_prompt(task, worktree_path)
 
-        return [
-            "ollama",
-            "run",
-            self.model,
-            prompt
-        ]
+        return ["ollama", "run", self.model, prompt]
 
     def _parse_output(self, stdout: str, stderr: str) -> Dict[str, Any]:
         """
@@ -231,12 +212,7 @@ Explanation: <explanation>
         Returns:
             Parsed results with code changes
         """
-        result = {
-            "success": False,
-            "code_changes": [],
-            "explanation": "",
-            "errors": []
-        }
+        result = {"success": False, "code_changes": [], "explanation": "", "errors": []}
 
         # Extract code blocks with file paths
         # Format: FILE: <path>\n```\n<code>\n```
@@ -244,13 +220,14 @@ Explanation: <explanation>
         matches = re.findall(file_pattern, stdout, re.DOTALL)
 
         for file_path, code in matches:
-            result["code_changes"].append({
-                "file": file_path.strip(),
-                "code": code.strip()
-            })
+            result["code_changes"].append(
+                {"file": file_path.strip(), "code": code.strip()}
+            )
 
         # Extract explanation
-        explanation_match = re.search(r"Explanation:\s*(.+?)(?:\n\n|\Z)", stdout, re.DOTALL)
+        explanation_match = re.search(
+            r"Explanation:\s*(.+?)(?:\n\n|\Z)", stdout, re.DOTALL
+        )
         if explanation_match:
             result["explanation"] = explanation_match.group(1).strip()
 
@@ -264,11 +241,7 @@ Explanation: <explanation>
 
         return result
 
-    async def _apply_changes(
-        self,
-        parsed: Dict[str, Any],
-        worktree_path: Path
-    ) -> None:
+    async def _apply_changes(self, parsed: Dict[str, Any], worktree_path: Path) -> None:
         """
         Apply code changes to worktree files.
 
@@ -289,15 +262,10 @@ Explanation: <explanation>
         # Commit changes if any
         if parsed.get("code_changes"):
             await self._commit_changes(
-                worktree_path,
-                f"Ollama: {parsed.get('explanation', 'Code changes')}"
+                worktree_path, f"Ollama: {parsed.get('explanation', 'Code changes')}"
             )
 
-    async def _commit_changes(
-        self,
-        worktree_path: Path,
-        message: str
-    ) -> None:
+    async def _commit_changes(self, worktree_path: Path, message: str) -> None:
         """
         Commit changes in worktree.
 
@@ -309,18 +277,23 @@ Explanation: <explanation>
 
         # Add all changes
         await asyncio.create_subprocess_exec(
-            "git", "add", ".",
+            "git",
+            "add",
+            ".",
             cwd=worktree_path,
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL
+            stderr=asyncio.subprocess.DEVNULL,
         )
 
         # Commit
         await asyncio.create_subprocess_exec(
-            "git", "commit", "-m", message,
+            "git",
+            "commit",
+            "-m",
+            message,
             cwd=worktree_path,
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL
+            stderr=asyncio.subprocess.DEVNULL,
         )
 
     def _estimate_cost(self, parsed_output: Dict[str, Any]) -> float:

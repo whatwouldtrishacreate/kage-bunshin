@@ -16,9 +16,8 @@ from typing import Optional
 from fastapi import Header, HTTPException, status
 from fastapi.security import APIKeyHeader
 
-from storage.database import DatabaseManager
 from orchestrator.service import OrchestratorService
-
+from storage.database import DatabaseManager
 
 # ============================================================================
 # Configuration
@@ -29,7 +28,11 @@ BASE_BRANCH = os.getenv("BASE_BRANCH", "main")
 
 # API Key configuration
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
-VALID_API_KEYS = set(os.getenv("API_KEYS", "").split(",")) if os.getenv("API_KEYS") else {"dev-key-12345"}
+VALID_API_KEYS = (
+    set(os.getenv("API_KEYS", "").split(","))
+    if os.getenv("API_KEYS")
+    else {"dev-key-12345"}
+)
 
 
 # ============================================================================
@@ -50,7 +53,7 @@ async def get_database() -> DatabaseManager:
     if _database is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not initialized"
+            detail="Database not initialized",
         )
     return _database
 
@@ -65,12 +68,14 @@ async def get_orchestrator() -> OrchestratorService:
     if _orchestrator is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Orchestrator not initialized"
+            detail="Orchestrator not initialized",
         )
     return _orchestrator
 
 
-async def verify_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Key")) -> str:
+async def verify_api_key(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+) -> str:
     """
     Verify API key from request header.
 
@@ -103,6 +108,7 @@ async def verify_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Ke
 # Startup/Shutdown Helpers
 # ============================================================================
 
+
 async def initialize_services():
     """
     Initialize global services on application startup.
@@ -117,9 +123,7 @@ async def initialize_services():
 
     # Initialize orchestrator
     _orchestrator = OrchestratorService(
-        project_dir=PROJECT_DIR,
-        database=_database,
-        base_branch=BASE_BRANCH
+        project_dir=PROJECT_DIR, database=_database, base_branch=BASE_BRANCH
     )
 
 
