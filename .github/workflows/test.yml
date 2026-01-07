@@ -30,8 +30,13 @@ jobs:
         source venv/bin/activate
         pytest tests/ -v --tb=short
       env:
-        # Set test environment variables if needed
         PYTHONPATH: .
+        # Database configuration for tests
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: claude_memory
+        DB_USER: claude_mcp
+        DB_PASSWORD: memory123
 
     - name: Upload test results
       if: always()
