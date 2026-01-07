@@ -17,15 +17,17 @@ jobs:
     - name: Check Python version
       run: |
         python3 --version
-        pip3 --version
 
-    - name: Install dependencies
+    - name: Set up virtual environment
       run: |
-        python3 -m pip install --upgrade pip
-        pip3 install -r requirements.txt
+        python3 -m venv venv
+        source venv/bin/activate
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
     - name: Run tests
       run: |
+        source venv/bin/activate
         pytest tests/ -v --tb=short
       env:
         # Set test environment variables if needed
