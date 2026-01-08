@@ -65,7 +65,7 @@ Think of it as **horizontal scaling for AI development** - instead of waiting fo
 - At least one supported AI CLI:
   - [Claude Code](https://github.com/anthropics/claude-code) (recommended)
   - Google Gemini CLI
-  - Ollama
+  - [Ollama](https://ollama.ai/) with qwen2.5-coder:32b (recommended for local/cost-free execution)
   - Auto-Claude
 
 ### Installation
@@ -248,6 +248,39 @@ Each adapter implements the `CLIAdapter` interface with methods:
 - `execute(task, context)` - Run CLI on task
 - `parse_result(output)` - Extract structured result
 - `estimate_cost(task)` - Predict token usage
+
+### Ollama Model Compatibility
+
+The Ollama adapter (`ollama.py`) supports local LLM execution with zero API costs. Tested models:
+
+**✅ Recommended Models:**
+- **qwen2.5-coder:32b** (19GB) - **PRIMARY RECOMMENDATION**
+  - Status: ✅ Fully functional in all scenarios
+  - Performance: 2-5 minutes for typical coding tasks
+  - Quality: Production-ready code with type hints and tests
+  - Cost: $0.00 (local execution)
+  - Use for: Code generation, refactoring, bug fixes, unit tests
+
+- **deepseek-r1:14b** (9GB) - Good for reasoning tasks
+  - Status: ✅ Fully functional
+  - Performance: 2-3 minutes for reasoning tasks
+  - Quality: Excellent step-by-step reasoning
+  - Use for: Complex problem-solving, algorithm design
+
+**⚠️ Known Issues:**
+- **deepseek-coder:33b** (18GB) - **NOT RECOMMENDED**
+  - Status: ⚠️ CLI display bug in Ollama 0.13.5
+  - Issue: Model works via API but `ollama run` shows only spinners
+  - Root Cause: Streaming output incompatibility
+  - Workaround: Use Ollama API directly with `stream: false`
+  - Details: See [investigation report](/tmp/DEEPSEEK_CODER_INVESTIGATION_REPORT.md)
+  - Recommendation: Use qwen2.5-coder:32b instead
+
+**Testing:**
+Comprehensive integration tests available in `tests/test_ollama_adapter.py`:
+- 23 tests covering ANSI stripping, output parsing, and execution
+- Run with: `pytest tests/test_ollama_adapter.py -v`
+- See `tests/README_OLLAMA_TESTS.md` for details
 
 ---
 
