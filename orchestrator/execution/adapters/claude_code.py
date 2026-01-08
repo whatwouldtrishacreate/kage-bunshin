@@ -22,15 +22,11 @@ Cost Model: $0.50-2.00 per task (Sonnet 4.5)
 
 import json
 import re
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .base import (
     CLIAdapter,
-    CLIExecutionError,
-    CLINotFoundError,
-    CLITimeoutError,
     ExecutionResult,
     ExecutionStatus,
     TaskAssignment,
@@ -56,10 +52,10 @@ class ClaudeCodeAdapter(CLIAdapter):
         Execute task using Claude Code.
 
         Workflow:
-        1. Write task prompt to temporary file
-        2. Run Claude Code in non-interactive mode
+        1. Build prompt content
+        2. Run Claude Code in non-interactive mode with prompt as argument
         3. Parse output and extract results
-        4. Track files modified
+        4. Track files modified and validate actual work was done
 
         Args:
             task: Task to execute
@@ -74,13 +70,10 @@ class ClaudeCodeAdapter(CLIAdapter):
         start_time = datetime.now()
 
         try:
-            # Step 1: Build prompt content
-            prompt_content = self._build_prompt(task)
-
-            # Step 2: Run Claude Code with prompt via stdin
+            # Step 1: Run Claude Code with prompt as command argument
             command = self._construct_command(task, worktree_path)
-            stdout, stderr, returncode = await self._run_subprocess_with_stdin(
-                command, worktree_path, task.timeout, prompt_content
+            stdout, stderr, returncode = await self._run_subprocess(
+                command, worktree_path, task.timeout
             )
 
             # Step 3: Parse output
@@ -93,13 +86,21 @@ class ClaudeCodeAdapter(CLIAdapter):
             # Step 5: Estimate cost
             cost = self._estimate_cost(parsed)
 
-            # Determine status
-            if returncode == 0:
-                status = ExecutionStatus.SUCCESS
-            elif returncode == 124:
+            # Determine status - validate actual work was done
+            error_msg = None
+            if returncode == 124:
                 status = ExecutionStatus.TIMEOUT
-            else:
+                error_msg = f"Claude Code execution timed out after {task.timeout}s"
+            elif returncode != 0:
                 status = ExecutionStatus.FAILURE
+                error_msg = stderr if stderr else "Command failed with non-zero exit code"
+            elif len(files_modified) == 0 and len(commits) == 0:
+                # Clean exit but no work done - false success
+                status = ExecutionStatus.FAILURE
+                error_msg = "Command completed but produced no output (no files modified or commits created)"
+            else:
+                # Actual success - files modified or commits created
+                status = ExecutionStatus.SUCCESS
 
             duration = (datetime.now() - start_time).total_seconds()
 
@@ -112,7 +113,7 @@ class ClaudeCodeAdapter(CLIAdapter):
                 cli_name=self.cli_name,
                 status=status,
                 output=stdout,
-                error=stderr if status == ExecutionStatus.FAILURE else None,
+                error=error_msg if status != ExecutionStatus.SUCCESS else None,
                 files_modified=files_modified,
                 commits=commits,
                 cost=cost,
@@ -177,10 +178,7 @@ Please proceed with implementing this task.
         """
         Construct Claude Code command.
 
-        Uses non-interactive mode with prompt via stdin.
-
-        Note: Claude Code doesn't have a --prompt flag. Instead, we use
-        --print mode and pipe the prompt via stdin.
+        Uses non-interactive mode with prompt as command argument.
 
         Args:
             task: Task to execute
@@ -189,57 +187,16 @@ Please proceed with implementing this task.
         Returns:
             Command as list of strings
         """
-        return ["claude", "--print", "--no-session-persistence"]
+        # Build prompt and pass as argument (not via stdin)
+        prompt = self._build_prompt(task)
 
-    async def _run_subprocess_with_stdin(
-        self, command: List[str], cwd: Path, timeout: int, stdin_content: str
-    ) -> tuple[str, str, int]:
-        """
-        Run command as async subprocess with stdin input.
+        return [
+            "claude",
+            "--print",
+            "--no-session-persistence",
+            prompt,  # Pass prompt as argument, not via stdin
+        ]
 
-        Args:
-            command: Command to execute
-            cwd: Working directory
-            timeout: Timeout in seconds
-            stdin_content: Content to pipe to stdin
-
-        Returns:
-            Tuple of (stdout, stderr, returncode)
-
-        Raises:
-            asyncio.TimeoutError: If command times out
-        """
-        import asyncio
-
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *command,
-                cwd=cwd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=self._get_env_vars(),
-            )
-
-            # Write prompt to stdin and communicate
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=stdin_content.encode("utf-8")), timeout=timeout
-            )
-
-            return (
-                stdout.decode("utf-8", errors="replace"),
-                stderr.decode("utf-8", errors="replace"),
-                proc.returncode,
-            )
-
-        except asyncio.TimeoutError:
-            # Kill the process
-            try:
-                proc.kill()
-                await proc.wait()
-            except:
-                pass
-            raise
 
     def _parse_output(self, stdout: str, stderr: str) -> Dict[str, Any]:
         """

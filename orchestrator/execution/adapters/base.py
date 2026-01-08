@@ -202,16 +202,21 @@ class CLIAdapter(ABC):
 
     async def _get_modified_files(self, worktree_path: Path) -> List[str]:
         """
-        Get list of modified files in worktree.
+        Get list of modified and untracked files in worktree.
+
+        Detects both:
+        - Tracked files with modifications (git diff)
+        - Untracked files (git ls-files)
 
         Args:
             worktree_path: Path to worktree
 
         Returns:
-            List of modified file paths
+            List of modified and untracked file paths
         """
         try:
-            proc = await asyncio.create_subprocess_exec(
+            # Get modified tracked files
+            proc1 = await asyncio.create_subprocess_exec(
                 "git",
                 "diff",
                 "--name-only",
@@ -220,10 +225,25 @@ class CLIAdapter(ABC):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, _ = await proc.communicate()
+            stdout1, _ = await proc1.communicate()
+            tracked_files = stdout1.decode("utf-8", errors="replace").strip().split("\n")
 
-            files = stdout.decode("utf-8", errors="replace").strip().split("\n")
-            return [f for f in files if f]
+            # Get untracked files (excluding .gitignore'd files)
+            proc2 = await asyncio.create_subprocess_exec(
+                "git",
+                "ls-files",
+                "--others",
+                "--exclude-standard",
+                cwd=worktree_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout2, _ = await proc2.communicate()
+            untracked_files = stdout2.decode("utf-8", errors="replace").strip().split("\n")
+
+            # Combine and deduplicate
+            all_files = tracked_files + untracked_files
+            return [f for f in all_files if f]
 
         except Exception as e:
             print(f"Warning: Could not get modified files: {e}")
