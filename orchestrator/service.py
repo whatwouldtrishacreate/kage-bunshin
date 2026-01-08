@@ -12,6 +12,7 @@ This is the main business logic layer between the API and execution engine.
 """
 
 import asyncio
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
@@ -190,6 +191,57 @@ class OrchestratorService:
             # Execute in parallel using Week 2 executor
             result = await self.executor.execute_parallel(config)
 
+            # === DEVELOPMENT DOCS: Capture execution results ===
+            try:
+                for cli_result in result.cli_results:
+                    # Create execution result record
+                    exec_id = await self.database.create_execution_result(
+                        task_id=task_id,
+                        cli_name=cli_result.cli_name,
+                        status=cli_result.status.value,
+                        duration=cli_result.duration,
+                        cost=cli_result.cost,
+                        retries=cli_result.retries,
+                        files_modified=cli_result.files_modified,
+                        commits=cli_result.commits,
+                        output_summary=cli_result.output[:500] if cli_result.output else "",
+                        error_message=cli_result.error
+                    )
+
+                    # Store full stdout if significant
+                    if cli_result.output and len(cli_result.output) > 500:
+                        await self.database.create_execution_output(
+                            execution_result_id=exec_id,
+                            output_type='stdout',
+                            content=cli_result.output
+                        )
+
+                    # Store stderr if present
+                    if cli_result.error:
+                        await self.database.create_execution_output(
+                            execution_result_id=exec_id,
+                            output_type='stderr',
+                            content=cli_result.error
+                        )
+
+                # Record performance metrics
+                await self.database.record_performance_metric(
+                    metric_name='parallel_execution_duration',
+                    metric_value=result.total_duration,
+                    metric_unit='seconds',
+                    context={'task_id': str(task_id), 'cli_count': len(result.cli_results)}
+                )
+
+                await self.database.record_performance_metric(
+                    metric_name='parallel_execution_cost',
+                    metric_value=result.total_cost,
+                    metric_unit='dollars',
+                    context={'task_id': str(task_id)}
+                )
+            except Exception as db_error:
+                # Log database error but don't fail the task
+                print(f"Warning: Failed to log to development_docs: {db_error}")
+
             # Store result in database
             await self.database.update_task_status(
                 task_id=task_id,
@@ -214,6 +266,17 @@ class OrchestratorService:
             )
 
         except Exception as e:
+            # === DEVELOPMENT DOCS: Log error ===
+            try:
+                await self.database.create_task_error(
+                    task_id=task_id,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    error_details={'traceback': traceback.format_exc()}
+                )
+            except Exception as db_error:
+                print(f"Warning: Failed to log error to development_docs: {db_error}")
+
             # Log error
             await self.database.update_task_status(
                 task_id=task_id,

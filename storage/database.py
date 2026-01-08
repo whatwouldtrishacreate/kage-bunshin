@@ -317,6 +317,201 @@ class DatabaseManager:
         return [self._row_to_progress_event(row) for row in rows]
 
     # ========================================================================
+    # Development Documentation Operations
+    # ========================================================================
+
+    async def create_execution_result(
+        self,
+        task_id: UUID,
+        cli_name: str,
+        status: str,
+        duration: float,
+        cost: float,
+        retries: int,
+        files_modified: List[str],
+        commits: List[str],
+        output_summary: str,
+        error_message: Optional[str] = None
+    ) -> int:
+        """
+        Create execution result record in development_docs schema.
+
+        Args:
+            task_id: Task UUID
+            cli_name: CLI tool name (ollama, claude-code, etc.)
+            status: Execution status (success, failure, etc.)
+            duration: Execution duration in seconds
+            cost: Execution cost in dollars
+            retries: Number of retries attempted
+            files_modified: List of modified file paths
+            commits: List of commit SHAs
+            output_summary: First 500 chars of output
+            error_message: Error message if failed
+
+        Returns:
+            Created execution_result ID
+        """
+        query = """
+            INSERT INTO development_docs.execution_results
+            (task_id, cli_name, status, duration, cost, retries,
+             files_modified, commits, output_summary, error_message)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id
+        """
+
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(
+                query, task_id, cli_name, status, duration, cost,
+                retries, files_modified, commits, output_summary, error_message
+            )
+
+    async def create_execution_output(
+        self,
+        execution_result_id: int,
+        output_type: str,
+        content: str
+    ) -> None:
+        """
+        Store large execution output (stdout/stderr) separately.
+
+        Args:
+            execution_result_id: Foreign key to execution_results
+            output_type: Type of output (stdout, stderr, parsed)
+            content: Full output content
+        """
+        query = """
+            INSERT INTO development_docs.execution_outputs
+            (execution_result_id, output_type, content, size_bytes)
+            VALUES ($1, $2, $3, $4)
+        """
+        size_bytes = len(content.encode('utf-8'))
+
+        async with self.pool.acquire() as conn:
+            await conn.execute(query, execution_result_id, output_type, content, size_bytes)
+
+    async def create_task_error(
+        self,
+        task_id: UUID,
+        error_type: str,
+        error_message: str,
+        error_details: Optional[Dict] = None
+    ) -> None:
+        """
+        Log task execution error to development_docs.
+
+        Args:
+            task_id: Task UUID
+            error_type: Error class name
+            error_message: Error message string
+            error_details: JSONB containing traceback, context, etc.
+        """
+        query = """
+            INSERT INTO development_docs.task_errors
+            (task_id, error_type, error_message, error_details)
+            VALUES ($1, $2, $3, $4)
+        """
+
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                query, task_id, error_type, error_message,
+                json.dumps(error_details) if error_details else None
+            )
+
+    async def record_performance_metric(
+        self,
+        metric_name: str,
+        metric_value: float,
+        metric_unit: str,
+        context: Optional[Dict] = None
+    ) -> None:
+        """
+        Record performance metric for analytics.
+
+        Args:
+            metric_name: Metric identifier (e.g., 'parallel_execution_duration')
+            metric_value: Numeric value
+            metric_unit: Unit of measurement (seconds, dollars, count, etc.)
+            context: Additional metadata as JSONB
+        """
+        query = """
+            INSERT INTO development_docs.performance_metrics
+            (metric_name, metric_value, metric_unit, context)
+            VALUES ($1, $2, $3, $4)
+        """
+
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                query, metric_name, metric_value, metric_unit,
+                json.dumps(context) if context else None
+            )
+
+    async def get_execution_results_for_task(self, task_id: UUID) -> List[Dict]:
+        """
+        Get all execution results for a task.
+
+        Args:
+            task_id: Task UUID
+
+        Returns:
+            List of execution result dictionaries
+        """
+        query = """
+            SELECT id, cli_name, status, duration, cost, retries,
+                   files_modified, commits, output_summary, error_message, created_at
+            FROM development_docs.execution_results
+            WHERE task_id = $1
+            ORDER BY created_at ASC
+        """
+
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, task_id)
+            return [dict(row) for row in rows]
+
+    async def get_execution_output(
+        self, execution_result_id: int, output_type: str
+    ) -> Optional[str]:
+        """
+        Retrieve full execution output.
+
+        Args:
+            execution_result_id: Execution result ID
+            output_type: Type of output (stdout, stderr, parsed)
+
+        Returns:
+            Output content string or None
+        """
+        query = """
+            SELECT content
+            FROM development_docs.execution_outputs
+            WHERE execution_result_id = $1 AND output_type = $2
+        """
+
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(query, execution_result_id, output_type)
+
+    async def get_recent_errors(self, limit: int = 50) -> List[Dict]:
+        """
+        Get recent task errors for debugging.
+
+        Args:
+            limit: Maximum number of errors to return
+
+        Returns:
+            List of error dictionaries with task descriptions
+        """
+        query = """
+            SELECT e.*, t.description as task_description
+            FROM development_docs.task_errors e
+            JOIN public.tasks t ON e.task_id = t.id
+            ORDER BY e.occurred_at DESC
+            LIMIT $1
+        """
+
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, limit)
+            return [dict(row) for row in rows]
+
+    # ========================================================================
     # Helper Methods
     # ========================================================================
 
