@@ -338,3 +338,19 @@ class CLITimeoutError(CLIExecutionError):
     """CLI execution timed out."""
 
     pass
+
+
+class BudgetExceededError(CLIExecutionError):
+    """Task exceeded allocated token budget."""
+
+    def __init__(
+        self,
+        message: str,
+        cli_name: str,
+        task_id: str,
+        tokens_used: int,
+        token_limit: int,
+    ):
+        super().__init__(message, cli_name, task_id)
+        self.tokens_used = tokens_used
+        self.token_limit = token_limit

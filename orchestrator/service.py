@@ -193,7 +193,44 @@ class OrchestratorService:
 
             # === DEVELOPMENT DOCS: Capture execution results ===
             try:
+                from orchestrator.utils.budget import TokenBudgetTracker
+
                 for cli_result in result.cli_results:
+                    # === PHASE 1 (LLM Council): Token Budget Enforcement ===
+                    # Track token usage and log budget violations
+                    budget_tracker = TokenBudgetTracker(
+                        task_id=str(task_id),
+                        cli_name=cli_result.cli_name
+                    )
+
+                    try:
+                        # Count input tokens (task description)
+                        budget_tracker.add_usage(config.description)
+
+                        # Count output tokens (stdout + stderr)
+                        if cli_result.output:
+                            budget_tracker.add_usage(cli_result.output)
+                        if cli_result.error:
+                            budget_tracker.add_usage(cli_result.error)
+
+                    except Exception as budget_error:
+                        # Log budget violation to development_docs.task_errors
+                        from orchestrator.execution.adapters.base import BudgetExceededError
+                        if isinstance(budget_error, BudgetExceededError):
+                            await self.database.create_task_error(
+                                task_id=task_id,
+                                error_type='BudgetExceededError',
+                                error_message=str(budget_error),
+                                error_details={
+                                    'cli_name': cli_result.cli_name,
+                                    'tokens_used': budget_error.tokens_used,
+                                    'token_limit': budget_error.token_limit,
+                                    'usage_stats': budget_tracker.get_usage()
+                                }
+                            )
+                            # Note: We still record the execution result even if budget exceeded
+                            # This allows analysis of what tasks cause budget issues
+
                     # Create execution result record
                     exec_id = await self.database.create_execution_result(
                         task_id=task_id,

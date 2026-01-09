@@ -31,6 +31,7 @@ from .base import (
     ExecutionStatus,
     TaskAssignment,
 )
+from orchestrator.utils.rate_limit import RateLimiter
 
 
 class ClaudeCodeAdapter(CLIAdapter):
@@ -44,6 +45,8 @@ class ClaudeCodeAdapter(CLIAdapter):
     def __init__(self):
         """Initialize Claude Code adapter."""
         super().__init__("claude-code")
+        # Phase 1 (LLM Council): Rate limiting for API calls
+        self.rate_limiter = RateLimiter()
 
     async def execute(
         self, task: TaskAssignment, worktree_path: Path
@@ -70,6 +73,9 @@ class ClaudeCodeAdapter(CLIAdapter):
         start_time = datetime.now()
 
         try:
+            # Phase 1 (LLM Council): Acquire rate limit slot before API call
+            await self.rate_limiter.acquire()
+
             # Step 1: Run Claude Code with prompt as command argument
             command = self._construct_command(task, worktree_path)
             stdout, stderr, returncode = await self._run_subprocess(
