@@ -133,6 +133,7 @@ class ClaudeAPIAdapter(CLIAdapter):
         self.total_input_tokens = 0
         self.total_output_tokens = 0
         self.total_tool_uses = 0
+        self._execution_count = 0
 
     async def execute(
         self, task: TaskAssignment, worktree_path: Path
@@ -162,24 +163,27 @@ class ClaudeAPIAdapter(CLIAdapter):
                 result["total_output_tokens"]
             )
 
-            # Determine status
-            status = (
-                ExecutionStatus.SUCCESS
-                if files_modified or result.get("completed", False)
-                else ExecutionStatus.FAILURE
-            )
+            # Determine status (must have files modified to be success)
+            # Similar to claude_code adapter: no files modified = false success
+            if not files_modified:
+                status = ExecutionStatus.FAILURE
+                error_msg = "Task completed but no files were modified"
+            else:
+                status = ExecutionStatus.SUCCESS
+                error_msg = None
 
             # Track metrics
             self.total_input_tokens += result["total_input_tokens"]
             self.total_output_tokens += result["total_output_tokens"]
             self.total_tool_uses += result["total_tool_uses"]
+            self._execution_count += 1
 
             return ExecutionResult(
                 task_id=task.task_id,
                 cli_name=self.cli_name,
                 status=status,
                 output=result["final_output"],
-                error=result.get("error"),
+                error=result.get("error") or error_msg,
                 files_modified=files_modified,
                 cost=cost,
                 duration=(datetime.now() - start_time).total_seconds()
@@ -449,31 +453,6 @@ Complete the task by using these tools. When finished, provide a summary of what
             return "Error: Command timed out (60s limit)"
         except Exception as e:
             return f"Error executing bash command: {str(e)}"
-
-    async def _get_modified_files(self, worktree_path: Path) -> List[str]:
-        """
-        Get list of modified files in worktree.
-
-        Args:
-            worktree_path: Path to worktree
-
-        Returns:
-            List of modified file paths
-        """
-        try:
-            result = subprocess.run(
-                ["git", "diff", "--name-only", "HEAD"],
-                cwd=str(worktree_path),
-                capture_output=True,
-                text=True,
-                check=False
-            )
-
-            if result.stdout:
-                return [f for f in result.stdout.strip().split('\n') if f]
-            return []
-        except Exception:
-            return []
 
     def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         """

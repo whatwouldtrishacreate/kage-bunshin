@@ -189,14 +189,15 @@ class TestAgenticLoop:
         response1.usage.input_tokens = 100
         response1.usage.output_tokens = 50
         response1.stop_reason = "tool_use"
-        response1.content = [
-            MagicMock(
-                type="tool_use",
-                name="read_file",
-                id="tool_1",
-                input={"path": "README.md"}
-            )
-        ]
+
+        # Create tool mock (avoid MagicMock name= kwarg which sets debug name)
+        tool_mock = MagicMock(
+            type="tool_use",
+            id="tool_1",
+            input={"path": "README.md"}
+        )
+        tool_mock.name = "read_file"
+        response1.content = [tool_mock]
 
         # Second response: complete after tool use
         response2 = MagicMock()
@@ -229,28 +230,28 @@ class TestAgenticLoop:
         response1.usage.input_tokens = 100
         response1.usage.output_tokens = 50
         response1.stop_reason = "tool_use"
-        response1.content = [
-            MagicMock(
-                type="tool_use",
-                name="read_file",
-                id="tool_1",
-                input={"path": "README.md"}
-            )
-        ]
+
+        tool_mock1 = MagicMock(
+            type="tool_use",
+            id="tool_1",
+            input={"path": "README.md"}
+        )
+        tool_mock1.name = "read_file"
+        response1.content = [tool_mock1]
 
         # Response 2: write_file
         response2 = MagicMock()
         response2.usage.input_tokens = 120
         response2.usage.output_tokens = 60
         response2.stop_reason = "tool_use"
-        response2.content = [
-            MagicMock(
-                type="tool_use",
-                name="write_file",
-                id="tool_2",
-                input={"path": "output.txt", "content": "Hello World"}
-            )
-        ]
+
+        tool_mock2 = MagicMock(
+            type="tool_use",
+            id="tool_2",
+            input={"path": "output.txt", "content": "Hello World"}
+        )
+        tool_mock2.name = "write_file"
+        response2.content = [tool_mock2]
 
         # Response 3: completion
         response3 = MagicMock()
@@ -281,15 +282,18 @@ class TestAgenticLoop:
         mock_response.usage.input_tokens = 100
         mock_response.usage.output_tokens = 50
         mock_response.stop_reason = "tool_use"
-        mock_response.content = [
-            MagicMock(
+
+        # Create tool mocks in list
+        tool_mocks = []
+        for i in range(20):
+            tool_mock = MagicMock(
                 type="tool_use",
-                name="bash",
                 id=f"tool_{i}",
                 input={"command": "echo test"}
             )
-            for i in range(20)
-        ]
+            tool_mock.name = "bash"
+            tool_mocks.append(tool_mock)
+        mock_response.content = tool_mocks
 
         mock_anthropic_client.messages.create = AsyncMock(return_value=mock_response)
 
@@ -544,14 +548,14 @@ class TestExecuteMethod:
         response1.usage.input_tokens = 100
         response1.usage.output_tokens = 50
         response1.stop_reason = "tool_use"
-        response1.content = [
-            MagicMock(
-                type="tool_use",
-                name="write_file",
-                id="tool_1",
-                input={"path": "hello.py", "content": "print('hello world')"}
-            )
-        ]
+
+        tool_mock = MagicMock(
+            type="tool_use",
+            id="tool_1",
+            input={"path": "hello.py", "content": "print('hello world')"}
+        )
+        tool_mock.name = "write_file"
+        response1.content = [tool_mock]
 
         response2 = MagicMock()
         response2.usage.input_tokens = 120
@@ -673,14 +677,14 @@ class TestMetrics:
         mock_response.usage.input_tokens = 2000
         mock_response.usage.output_tokens = 1000
         mock_response.stop_reason = "tool_use"
-        mock_response.content = [
-            MagicMock(
-                type="tool_use",
-                name="bash",
-                id="tool_1",
-                input={"command": "echo test"}
-            )
-        ]
+
+        tool_mock = MagicMock(
+            type="tool_use",
+            id="tool_1",
+            input={"command": "echo test"}
+        )
+        tool_mock.name = "bash"
+        mock_response.content = [tool_mock]
 
         response2 = MagicMock()
         response2.usage.input_tokens = 2100
@@ -863,10 +867,13 @@ class TestTextExtraction:
 
     def test_extract_text_mixed_content(self, adapter_with_mock):
         """Test extracting text from mixed content (text + tool_use)."""
+        tool_mock = MagicMock(type="tool_use")
+        tool_mock.name = "bash"
+
         response = MagicMock()
         response.content = [
             MagicMock(type="text", text="Before tool"),
-            MagicMock(type="tool_use", name="bash"),
+            tool_mock,
             MagicMock(type="text", text="After tool")
         ]
 
@@ -876,10 +883,11 @@ class TestTextExtraction:
 
     def test_extract_text_no_text_blocks(self, adapter_with_mock):
         """Test extracting text when no text blocks present."""
+        tool_mock = MagicMock(type="tool_use")
+        tool_mock.name = "bash"
+
         response = MagicMock()
-        response.content = [
-            MagicMock(type="tool_use", name="bash")
-        ]
+        response.content = [tool_mock]
 
         text = adapter_with_mock._extract_text(response)
         assert text == ""
