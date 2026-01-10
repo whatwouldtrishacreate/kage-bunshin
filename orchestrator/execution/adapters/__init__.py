@@ -10,6 +10,7 @@ from .base import (
     ExecutionStatus,
     TaskAssignment,
 )
+from .claude_api import ClaudeAPIAdapter  # Phase 2: API worker adapter
 from .claude_code import ClaudeCodeAdapter
 from .gemini import GeminiAdapter
 from .ollama import OllamaAdapter
@@ -29,4 +30,5 @@ __all__ = [
     "OllamaAdapter",
     "ClaudeCodeAdapter",
     "GeminiAdapter",
+    "ClaudeAPIAdapter",  # Phase 2
 ]

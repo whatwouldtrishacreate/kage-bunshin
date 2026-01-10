@@ -27,6 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..state.checkpoint import CheckpointManager
 from ..state.context import ContextManager
 from ..state.locks import LockManager
 from ..state.worktree import SessionWorktree, WorktreeManager
@@ -106,6 +107,7 @@ class ParallelExecutor:
         self.worktree_manager = WorktreeManager(project_dir, base_branch)
         self.lock_manager = LockManager(project_dir)
         self.context_manager = ContextManager(project_dir)
+        self.checkpoint_manager = CheckpointManager(project_dir)  # Phase 2: Checkpoint/rollback
 
         # Setup
         self.worktree_manager.setup()
@@ -227,6 +229,33 @@ class ParallelExecutor:
         Returns:
             ExecutionResult (possibly after retries)
         """
+        # Merge shared context with CLI-specific delta (context efficiency)
+        # Note: get_cli_context() already handles fallback gracefully
+        merged_context = await self.context_manager.get_cli_context(
+            task_id=task.task_id,
+            cli_name=task.cli_name,
+            cli_specific=task.context
+        )
+        enriched_task = TaskAssignment(
+            task_id=task.task_id,
+            cli_name=task.cli_name,
+            description=task.description,
+            context=merged_context,  # Full merged context (or fallback)
+            timeout=task.timeout,
+            max_retries=task.max_retries,
+        )
+
+        # Create baseline checkpoint before execution (Phase 2: Checkpoint/rollback)
+        baseline_checkpoint = None
+        try:
+            baseline_checkpoint = await self.checkpoint_manager.create_checkpoint(
+                session=session,
+                reason="Pre-execution baseline"
+            )
+        except Exception as e:
+            # Non-critical: continue without checkpoint
+            print(f"Warning: Failed to create baseline checkpoint: {e}")
+
         retries = 0
 
         while retries <= max_retries:
@@ -238,8 +267,8 @@ class ParallelExecutor:
                     message=f"Attempt {retries + 1}/{max_retries + 1}",
                 )
 
-                # Execute
-                result = await adapter.execute(task, session.worktree_path)
+                # Execute with merged context
+                result = await adapter.execute(enriched_task, session.worktree_path)
 
                 # Check if successful
                 if result.status == ExecutionStatus.SUCCESS:
@@ -252,6 +281,31 @@ class ParallelExecutor:
                 # Check if should retry
                 if retries < max_retries and self._should_retry(result):
                     retries += 1
+
+                    # Phase 2: Get recovery strategy and apply rollback if recommended
+                    try:
+                        strategy = await self.checkpoint_manager.suggest_recovery_strategy(
+                            session=session,
+                            failure_result=result
+                        )
+
+                        if strategy.recommended_checkpoint:
+                            # Rollback to recommended checkpoint
+                            rollback_result = await self.checkpoint_manager.rollback_to_checkpoint(
+                                session=session,
+                                checkpoint=strategy.recommended_checkpoint
+                            )
+
+                            if rollback_result.success:
+                                print(
+                                    f"Rolled back to checkpoint {strategy.recommended_checkpoint.checkpoint_id}: "
+                                    f"{strategy.reasoning}"
+                                )
+                            else:
+                                print(f"Rollback failed: {rollback_result.error}")
+                    except Exception as e:
+                        # Non-critical: continue retry without rollback
+                        print(f"Warning: Recovery strategy failed: {e}")
 
                     # Calculate delay with exponential backoff
                     if use_backoff:

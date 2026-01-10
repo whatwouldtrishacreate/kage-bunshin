@@ -157,6 +157,19 @@ class OrchestratorService:
         for assignment in config.assignments:
             assignment.task_id = str(task.id)
 
+        # Create shared base context for context efficiency (Phase 2)
+        try:
+            # Use first assignment's context as template for base extraction
+            if config.assignments:
+                sample_context = config.assignments[0].context
+                await self.executor.context_manager.shared_context_store.create_base_context(
+                    task_id=str(task.id),
+                    full_context=sample_context
+                )
+        except Exception as e:
+            # Non-critical: continue without shared context
+            print(f"Warning: Failed to create shared context for task {task.id}: {e}")
+
         # Start execution in background
         execution_task = asyncio.create_task(self._execute_task(task.id, config))
         self._running_tasks[task.id] = execution_task

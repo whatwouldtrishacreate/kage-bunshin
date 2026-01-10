@@ -53,6 +53,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .shared_context import SharedContextStore
 from .worktree import SessionWorktree
 
 
@@ -99,6 +100,9 @@ class ContextManager:
         self.project_dir = project_dir
         self.context_dir = project_dir / ".cli-council" / "context"
         self.context_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize SharedContextStore for context efficiency
+        self.shared_context_store = SharedContextStore(project_dir)
 
     def _get_context_file_path(self, session_id: str) -> Path:
         """Get the path to a session's context file."""
@@ -411,3 +415,37 @@ class ContextManager:
             count += 1
 
         return count
+
+    # ==================== Shared Context Integration ====================
+
+    async def get_cli_context(
+        self,
+        task_id: str,
+        cli_name: str,
+        cli_specific: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Get merged context for a CLI (base + CLI-specific delta).
+
+        Attempts to use SharedContextStore for efficiency. Falls back to
+        using cli_specific directly if no base context exists.
+
+        Args:
+            task_id: Task identifier
+            cli_name: CLI name
+            cli_specific: CLI-specific context delta
+
+        Returns:
+            Merged full context dictionary
+        """
+        try:
+            # Try to merge with base context
+            merged = await self.shared_context_store.get_merged_context(
+                task_id=task_id,
+                cli_name=cli_name,
+                delta=cli_specific
+            )
+            return merged
+        except Exception:
+            # Graceful fallback: use cli_specific as-is
+            return cli_specific

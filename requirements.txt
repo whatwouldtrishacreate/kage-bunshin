@@ -12,6 +12,9 @@ sse-starlette==1.8.2
 # Database
 asyncpg==0.31.0  # PostgreSQL async driver
 
+# AI SDKs (Phase 2)
+anthropic>=0.40.0  # Claude API SDK for API worker adapter
+
 # Data Validation (updated for Python 3.13 compat)
 pydantic>=2.10.0
 pydantic-settings>=2.7.0
