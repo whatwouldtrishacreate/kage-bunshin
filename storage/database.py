@@ -509,7 +509,14 @@ class DatabaseManager:
 
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, limit)
-            return [dict(row) for row in rows]
+            result = []
+            for row in rows:
+                row_dict = dict(row)
+                # Parse JSONB error_details from string back to dict
+                if row_dict.get('error_details'):
+                    row_dict['error_details'] = json.loads(row_dict['error_details'])
+                result.append(row_dict)
+            return result
 
     # ========================================================================
     # Helper Methods
