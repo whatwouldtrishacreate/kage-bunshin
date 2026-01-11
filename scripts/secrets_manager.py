@@ -44,10 +44,15 @@ class SecretsManager:
             database_url: PostgreSQL connection string
             encryption_key: Master encryption key for pgcrypto
         """
-        self.database_url = database_url or os.getenv(
-            "DATABASE_URL",
-            "postgresql://ndninja@localhost/claude_memory"
-        )
+        # Support both URL format and individual params for Unix socket connections
+        self.database_url = database_url or os.getenv("DATABASE_URL")
+
+        # Default connection params for local Unix socket (peer auth)
+        self._db_params = {
+            "dbname": os.getenv("PGDATABASE", "claude_memory"),
+            "user": os.getenv("PGUSER", "ndninja"),
+            "host": os.getenv("PGHOST", ""),  # Empty = Unix socket
+        }
         self.encryption_key = encryption_key or os.getenv("KB_ENCRYPTION_KEY")
         self._conn = None
 
@@ -55,7 +60,12 @@ class SecretsManager:
     def conn(self):
         """Get or create database connection."""
         if self._conn is None or self._conn.closed:
-            self._conn = psycopg2.connect(self.database_url)
+            if self.database_url:
+                # Use URL if explicitly provided
+                self._conn = psycopg2.connect(self.database_url)
+            else:
+                # Use params for Unix socket peer auth (default)
+                self._conn = psycopg2.connect(**self._db_params)
         return self._conn
 
     def _require_key(self):
@@ -232,7 +242,10 @@ class SecretsManager:
                 value, self.encryption_key, category, environment, description
             ))
 
-            secret_id = cur.fetchone()[0]
+            result = cur.fetchone()
+            if result is None:
+                raise RuntimeError(f"Failed to store secret '{name}'")
+            secret_id = result[0]
 
             # Log write
             cur.execute("""
