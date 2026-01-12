@@ -56,7 +56,7 @@ class ClaudeCodeAdapter(CLIAdapter):
 
         Workflow:
         1. Build prompt content
-        2. Run Claude Code in non-interactive mode with prompt as argument
+        2. Run Claude Code in non-interactive mode with prompt via stdin
         3. Parse output and extract results
         4. Track files modified and validate actual work was done
 
@@ -76,10 +76,13 @@ class ClaudeCodeAdapter(CLIAdapter):
             # Phase 1 (LLM Council): Acquire rate limit slot before API call
             await self.rate_limiter.acquire()
 
-            # Step 1: Run Claude Code with prompt as command argument
+            # Step 1: Build prompt and command separately
+            prompt = self._build_prompt(task)
             command = self._construct_command(task, worktree_path)
-            stdout, stderr, returncode = await self._run_subprocess(
-                command, worktree_path, task.timeout
+
+            # Run Claude Code with prompt via stdin (avoids shell escaping issues)
+            stdout, stderr, returncode = await self._run_subprocess_with_stdin(
+                command, worktree_path, task.timeout, prompt
             )
 
             # Step 3: Parse output
@@ -184,24 +187,84 @@ Please proceed with implementing this task.
         """
         Construct Claude Code command.
 
-        Uses non-interactive mode with prompt as command argument.
+        Uses non-interactive mode with prompt passed via stdin.
 
         Args:
             task: Task to execute
             worktree_path: Worktree path
 
         Returns:
-            Command as list of strings
+            Command as list of strings (prompt passed separately via stdin)
         """
-        # Build prompt and pass as argument (not via stdin)
-        prompt = self._build_prompt(task)
-
+        # Build command with full autonomy for Kage Bunshin parallel execution
+        # --print: Non-interactive mode, output only
+        # --no-session-persistence: Don't save session state
+        # --dangerously-skip-permissions: Bypass all permission prompts
+        # --add-dir: Allow access to the worktree directory
+        # Prompt is passed via stdin to avoid shell escaping issues with long/complex prompts
         return [
             "claude",
             "--print",
             "--no-session-persistence",
-            prompt,  # Pass prompt as argument, not via stdin
+            "--dangerously-skip-permissions",
+            "--add-dir", str(worktree_path),
         ]
+
+    async def _run_subprocess_with_stdin(
+        self, command: List[str], cwd: Path, timeout: int, stdin_data: str
+    ) -> tuple[str, str, int]:
+        """
+        Run command as async subprocess with stdin input.
+
+        This method passes the prompt via stdin to avoid shell escaping issues
+        with long prompts containing special characters.
+
+        Args:
+            command: Command to execute
+            cwd: Working directory
+            timeout: Timeout in seconds
+            stdin_data: Data to pass to stdin (the prompt)
+
+        Returns:
+            Tuple of (stdout, stderr, returncode)
+
+        Raises:
+            asyncio.TimeoutError: If command times out
+        """
+        import asyncio
+
+        proc = None
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=cwd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=self._get_env_vars(),
+            )
+
+            # Pass prompt via stdin and wait for completion
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(input=stdin_data.encode("utf-8")),
+                timeout=timeout
+            )
+
+            return (
+                stdout.decode("utf-8", errors="replace"),
+                stderr.decode("utf-8", errors="replace"),
+                proc.returncode or 0,
+            )
+
+        except asyncio.TimeoutError:
+            # Kill the process
+            if proc is not None:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except Exception:
+                    pass
+            raise
 
 
     def _parse_output(self, stdout: str, stderr: str) -> Dict[str, Any]:
